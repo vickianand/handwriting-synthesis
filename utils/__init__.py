@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from matplotlib import pyplot
 
@@ -28,6 +29,7 @@ def plot_stroke(stroke, save_name=None):
     if save_name is None:
         pyplot.show()
     else:
+        os.makedirs('/'.join(save_name.split('/')[:-1]), exist_ok=True)
         try:
             pyplot.savefig(
                 save_name,

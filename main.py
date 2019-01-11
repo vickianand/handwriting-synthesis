@@ -1,4 +1,5 @@
 import sys
+import os
 import math
 import numpy as np
 from matplotlib import pyplot
@@ -115,10 +116,11 @@ class HandWritingData(Dataset):
 # ------------------------------------------------------------------------------
 
 
-def train(device, data_path = "data/"):
+def train(device, data_path = "data/", batch_size = 128):
     '''
     '''
     model_path = data_path + "unconditional_models/"
+    os.makedirs(model_path, exist_ok=True)
 
     strokes = np.load(data_path + "strokes.npy", encoding='latin1')
     sentences = ""
@@ -151,9 +153,6 @@ def train(device, data_path = "data/"):
                                     weight_decay=0)
     # optimizer = torch.optim.RMSprop(handWritingRNN.parameters(), lr=1e-2, 
     #                                   weight_decay=0, momentum=0)
-
-
-    batch_size = 128
     
     tstrokes = [torch.from_numpy(stroke).to(device) for stroke in strokes]
     handWritingData = HandWritingData(tstrokes)
@@ -205,17 +204,17 @@ def train(device, data_path = "data/"):
           model_file = model_path + "handwriting_uncond_ep{}.pt".format(epoch)
           torch.save(handWritingRNN.state_dict(), model_file)
         
-        generated_samples = handWritingRNN.random_sample(length=400, count=2, 
+        generated_samples = handWritingRNN.random_sample(length=600, count=2, 
                                 device=device)
 
         plot_stroke(generated_samples[:, 0, :].cpu().numpy(), 
-                save_name="data/training/uncond_sample1_ep{}.png".format(epoch))
+                save_name="data/training/uncond_ep{}_1.png".format(epoch))
         plot_stroke(generated_samples[:, 1, :].cpu().numpy(),
-                save_name="data/training/uncond_sample2_ep{}.png".format(epoch))
+                save_name="data/training/uncond_ep{}_2.png".format(epoch))
 
 
 def generate_from_model(model_name, model_path="data/unconditional_models/", 
-        sample_length=300, num_sample=2, device=torch.device("cuda")):
+        sample_length=600, num_sample=2, device=torch.device("cpu")):
     '''
     Generate num_sample (default 2) number of samples each of length 
     sample_length (default 300) using a pretrained model
@@ -223,13 +222,15 @@ def generate_from_model(model_name, model_path="data/unconditional_models/",
     model_file = model_path + model_name
     handWritingRNN = HandWritingRNN()
     handWritingRNN.load_state_dict(torch.load(model_file
-                                    , map_location=torch.device("cpu")))
+                                    , map_location=device))
     handWritingRNN.to(device)
     generated_samples = handWritingRNN.random_sample(device=device, 
-                                                        length=600, count=2)
-    plot_stroke(generated_samples[:, 0, :].cpu().numpy())
-    plot_stroke(generated_samples[:, 1, :].cpu().numpy())
+                            length=sample_length, count=num_sample)
 
+    for i in range(num_sample):
+        plot_stroke(generated_samples[:, i, :].cpu().numpy(),
+            save_name="data/samples/{}_{}.png".format(
+                model_name.replace(".pt", ""), i))
 # ------------------------------------------------------------------------------
 
 
@@ -245,15 +246,14 @@ def main():
     # torch.random.manual_seed(101)
 
     # training
-    train(device)
+    train(device=device, batch_size=3)
 
     # generate samples from some available trained models
-    epoch_list = [93, 67, 51]
+    epoch_list = [93]
     for epoch in epoch_list:
         print("Sampling from epoch {} model.".format(epoch))
         generate_from_model(model_name='handwriting_uncond_ep{}.pt'.format(epoch),
                                 device=device)
-        print("===========================================================\n\n")
 
 
 
