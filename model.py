@@ -68,7 +68,7 @@ class HandWritingRNN(torch.nn.Module):
 
         return e, pi, mu, sigma, rho, lstm_out_states
 
-    def random_sample(self, length=300, count=1, device=torch.device("cpu")):
+    def generate(self, length=300, count=1, device=torch.device("cpu")):
         """
         Get a random sample from the distribution (model)
         """
@@ -144,7 +144,7 @@ class HandWritingSynthRNN(torch.nn.Module):
         self.n_gaussians = n_gaussians
         self.n_gaussians_window = n_gaussians_window
         self.memory_cells = memory_cells
-        # self.n_char = n_char
+        self.n_char = n_char
         # self.batch_size = batch_size
 
         self.first_rnn = torch.nn.LSTMCell(3 + n_char, memory_cells)
@@ -174,27 +174,25 @@ class HandWritingSynthRNN(torch.nn.Module):
         first_layer of self.rnns gets inp as input
         subsequent layers of self.rnns get inp concatenated with output of
         previous layer as the input. 
-        args : 
-            inp : input sequence of dimensions (T, B, 3)
-            c_seq : one-hot encoded char sequence of dimension (B, U, n_char)
-            lstm_in_states : input states for num_layers number of lstm layers;
-                            it is a list of num_layers tupels (h_i, c_i), with 
-                            both h_i and c_i tensor of dimensions (memory_cells,)
-            prev_window : (B, n_char)
-            prev_kappa : (B, K=10, 1)
+        args: 
+            inp: input sequence of dimensions (T, B, 3)
+            c_seq: one-hot encoded and padded char sequence of 
+                dimension (B, U, n_char)
+            lstm_in_states: input states for num_layers number of lstm 
+                layers; it is a list of num_layers tupels (h_i, c_i), with
+                both h_i and c_i tensor of dimensions (memory_cells,)
+            prev_window: (B, n_char)
+            prev_kappa: (B, K=10, 1)
         """
         # run first rnn layer
         # rnn_inp = torch.cat((inp, self.prev_window), dim=2)  # (T, B, 3+n_char)
 
-        if prev_window == None:
-            prev_window = torch.zeros(inp.shape[1], c_seq.shape[-1])  # (B, n_char)
-
         window_list = []
         first_rnn_out = []
         h, c = (
-            lstm_in_states[0]
-            if (lstm_in_states != None)
-            else [torch.zeros(inp.shape[1], self.memory_cells)] * 2
+            [torch.zeros(inp.shape[1], self.memory_cells)] * 2
+            if lstm_in_states is None
+            else lstm_in_states[0]
         )
         for x in inp:
             rnn_inp = torch.cat((x, prev_window), dim=1)  # (B, 3+n_char)
@@ -244,5 +242,67 @@ class HandWritingSynthRNN(torch.nn.Module):
         rho = self.tanh(y[:, :, 5 * self.n_gaussians : 6 * self.n_gaussians]) * 0.9
         e = self.sigmoid(y[:, :, 6 * self.n_gaussians])
 
-        return e, pi, mu, sigma, rho, lstm_out_states
+        return e, pi, mu, sigma, rho, lstm_out_states, prev_window, prev_kappa
 
+    def generate(self, sentences, device=torch.device("cpu")):
+        """
+        Get handwritten form for given sentences
+        arguments:
+            sentences: List of one-hot encoded sentences (without padding)
+        return:
+            samples: tensor of handwritten form for the sentences
+        """
+        c_seq = torch.nn.utils.rnn.pad_sequence(
+            sentences, batch_first=True, padding_value=0.0
+        )
+        count, c_seq_len, n_char = c_seq.shape
+        length = 600  # this needs to change (length should not be hard-coded)
+        # zeros matrix of required shape with batch_first = False
+        samples = torch.zeros(length + 1, count, 3, device=device)
+        lstm_states = None
+        window = torch.zeros(count, n_char)
+        kappa = torch.zeros(count, self.n_gaussians_window, 1)
+
+        for i in range(1, length + 1):
+            # get distribution parameters
+            with torch.no_grad():
+                e, pi, mu, sigma, rho, lstm_states, window, kappa = self.forward(
+                    samples[i - 1 : i], c_seq, lstm_states, window, kappa
+                )
+            # sample from the distribution (returned parameters)
+            # samples[i, :, 0] = e[-1, :] > 0.5
+            distrbn1 = Bernoulli(e[-1, :])
+            samples[i, :, 0] = distrbn1.sample()
+
+            # selected_mode = torch.argmax(pi[-1, :, :], dim=1) # shape = (count,)
+            distrbn2 = Categorical(pi[-1, :, :])
+            selected_mode = distrbn2.sample()
+
+            index_1 = selected_mode.unsqueeze(1)  # shape (count, 1)
+            index_2 = torch.stack([index_1, index_1], dim=2)  # shape (count, 1, 2)
+
+            mu = (
+                mu[-1]
+                .view(count, self.n_gaussians, 2)
+                .gather(dim=1, index=index_2)
+                .squeeze()
+            )
+            sigma = (
+                sigma[-1]
+                .view(count, self.n_gaussians, 2)
+                .gather(dim=1, index=index_2)
+                .squeeze()
+            )
+            rho = rho[-1].gather(dim=1, index=index_1).squeeze()
+
+            sigma2d = sigma.new_zeros(count, 2, 2)
+            sigma2d[:, 0, 0] = sigma[:, 0] ** 2
+            sigma2d[:, 1, 1] = sigma[:, 1] ** 2
+            sigma2d[:, 0, 1] = rho[:] * sigma[:, 0] * sigma[:, 1]
+            sigma2d[:, 1, 0] = sigma2d[:, 0, 1]
+
+            distribn = MultivariateNormal(loc=mu, covariance_matrix=sigma2d)
+
+            samples[i, :, 1:] = distribn.sample()
+
+        return samples[1:, :, :]  # remove dummy first zeros

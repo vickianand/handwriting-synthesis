@@ -2,11 +2,12 @@ import sys
 import os
 import argparse
 import math
+import pickle
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, SubsetRandomSampler
 
-from utils import plot_stroke, normalize_data3, filter_long_strokes, one_hot
+from utils import plot_stroke, normalize_data3, filter_long_strokes, OneHotEncoder
 from model import HandWritingRNN, HandWritingSynthRNN
 
 # ------------------------------------------------------------------------------
@@ -150,9 +151,9 @@ def train(device, batch_size, data_path="data/", uncond=False):
     """
     random_seed = 42
 
-    model_path = data_path + "conditional_models/"
-    if uncond:
-        model_path = data_path + "unconditional_models/"
+    model_path = data_path + (
+        "unconditional_models/" if uncond else "conditional_models/"
+    )
     os.makedirs(model_path, exist_ok=True)
 
     strokes = np.load(data_path + "strokes.npy", encoding="latin1")
@@ -168,7 +169,9 @@ def train(device, batch_size, data_path="data/", uncond=False):
     )
     # print("Max sentence len after filter is: {}".format(MAX_SENTENCE_LEN))
     N_CHAR = 57  # dimension of one-hot representation
-    sentences_oh = one_hot(sentences, n_char=N_CHAR)
+    oh_encoder = OneHotEncoder(sentences, n_char=N_CHAR)
+    pickle.dump(oh_encoder, open("data/one_hot_encoder.pkl", "wb"))
+    sentences_oh = oh_encoder.one_hot(sentences)
 
     # normalize strokes data and convert to pytorch tensors
     strokes = normalize_data3(strokes)
@@ -252,19 +255,30 @@ def train(device, batch_size, data_path="data/", uncond=False):
         epoch_avg_loss = np.array(train_losses).mean()
         print("Average training-loss for epoch {} is: {}".format(epoch, epoch_avg_loss))
 
+        # save model if loss is better than previous best
         if epoch_avg_loss < best_epoch_avg_loss:
             best_epoch_avg_loss = epoch_avg_loss
-            model_file = model_path + "handwriting_uncond_ep{}.pt".format(epoch)
+            model_file = model_path + "handwriting_{}cond_ep{}.pt".format(
+                ("un" if uncond else ""), epoch
+            )
             torch.save(model.state_dict(), model_file)
 
+        # generate samples from model
         sample_count = 2
-        generated_samples = model.random_sample(
-            length=600, count=sample_count, device=device
+        sentences = ["Welcome to Lyrebird"] + ["Hello World"] * (sample_count - 1)
+        generated_samples = (
+            model.generate(length=600, count=sample_count, device=device)
+            if uncond
+            else model.generate(sentences=oh_encoder.one_hot(sentences), device=device)
         )
+
+        # save png files of the generated models
         for i in range(sample_count):
             plot_stroke(
                 generated_samples[:, i, :].cpu().numpy(),
-                save_name="data/training/uncond_ep{}_{}.png".format(epoch, i),
+                save_name="data/training/{}cond_ep{}_{}.png".format(
+                    ("un" if uncond else ""), epoch, i
+                ),
             )
 
 

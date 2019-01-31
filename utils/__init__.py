@@ -124,35 +124,45 @@ def filter_long_strokes(strokes, senences, stroke_len_threshold):
     return strokes, senences, max_sentence_len
 
 
-def one_hot(sentences, n_char=57):
-    """
-    Takes a list of setences and returns a list of torch tensors of the one-hot  
-    encoded (char level) forms of the sentences.
-    Arguments:
-        sentences : list of strings (s)
-        n_chars : integer
+class OneHotEncoder:
+    def __init__(self, sentences, n_char=57):
+        """ 
+        Takes a list of setences and builds a dictionary (char_to_idx) for 
+        char to integer-index mapping
+        Arguments:
+            sentences : list of strings (s)
+            n_char : integer
+        """
+        self.n_char = n_char
+        char_counts = Counter("".join(sentences))
+        char_counts = sorted(char_counts.items(), key=lambda x: x[1], reverse=True)
 
-    returns:
-        one_hot_ : list of torch tensors of shapes (len(s), n_char)
-    """
-    char_counts = Counter("".join(sentences))
-    char_counts = sorted(char_counts.items(), key=lambda x: x[1], reverse=True)
+        self.char_to_idx = {}
 
-    char_to_idx = {}
+        for i in range(n_char - 1):
+            # for 56 most frequent characters, we give a unique id
+            self.char_to_idx[char_counts[i][0]] = i
 
-    for i in range(n_char - 1):  # for 56 most frequent characters, we give a unique id
-        char_to_idx[char_counts[i][0]] = i
+        for kv in char_counts[n_char - 1 :]:
+            self.char_to_idx[kv[0]] = n_char - 1
 
-    for kv in char_counts[n_char - 1 :]:
-        char_to_idx[kv[0]] = n_char - 1
+    def one_hot(self, sentences):
+        """
+        Takes a list of setences and returns a list of torch tensors of the one-hot  
+        encoded (char level) forms of the sentences.
+        Arguments:
+            sentences : list of strings (s)
+        returns:
+            one_hot_ : list of torch tensors of shapes (len(s), n_char)
+        """
+        sentences_idx = [
+            torch.tensor([[self.char_to_idx[c]] for c in snt]) for snt in sentences
+        ]
 
-    sentences_idx = [torch.tensor([[char_to_idx[c]] for c in snt]) for snt in sentences]
-
-    one_hot_ = [
-        torch.zeros(idx_tnsr.shape[0], n_char).scatter_(
-            dim=1, index=idx_tnsr, value=1.0
-        )
-        for idx_tnsr in sentences_idx
-    ]
-    return one_hot_
-
+        one_hot_ = [
+            torch.zeros(idx_tnsr.shape[0], self.n_char).scatter_(
+                dim=1, index=idx_tnsr, value=1.0
+            )
+            for idx_tnsr in sentences_idx
+        ]
+        return one_hot_
