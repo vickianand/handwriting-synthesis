@@ -171,7 +171,7 @@ def train(device, batch_size, data_path="data/", uncond=False):
     N_CHAR = 57  # dimension of one-hot representation
     oh_encoder = OneHotEncoder(sentences, n_char=N_CHAR)
     pickle.dump(oh_encoder, open("data/one_hot_encoder.pkl", "wb"))
-    sentences_oh = oh_encoder.one_hot(sentences)
+    sentences_oh = [s.to(device) for s in oh_encoder.one_hot(sentences)]
 
     # normalize strokes data and convert to pytorch tensors
     strokes = normalize_data3(strokes)
@@ -237,7 +237,7 @@ def train(device, batch_size, data_path="data/", uncond=False):
             if uncond:
                 inputs = (inp_x,)
 
-            e, pi, mu, sigma, rho, _ = model(*inputs)
+            e, pi, mu, sigma, rho, _, _, _ = model(*inputs)
 
             loss = criterion(x, e, pi, mu, sigma, rho, masks)
             train_losses.append(loss.detach().cpu().numpy())
@@ -266,10 +266,11 @@ def train(device, batch_size, data_path="data/", uncond=False):
         # generate samples from model
         sample_count = 2
         sentences = ["Welcome to Lyrebird"] + ["Hello World"] * (sample_count - 1)
+        sentences = [s.to(device) for s in oh_encoder.one_hot(sentences)]
         generated_samples = (
             model.generate(length=600, count=sample_count, device=device)
             if uncond
-            else model.generate(sentences=oh_encoder.one_hot(sentences), device=device)
+            else model.generate(sentences=sentences, device=device)
         )
 
         # save png files of the generated models

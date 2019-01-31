@@ -184,13 +184,14 @@ class HandWritingSynthRNN(torch.nn.Module):
             prev_window: (B, n_char)
             prev_kappa: (B, K=10, 1)
         """
-        # run first rnn layer
-        # rnn_inp = torch.cat((inp, self.prev_window), dim=2)  # (T, B, 3+n_char)
+
+        if prev_window is None:
+            prev_window = inp.new_zeros(inp.shape[1], c_seq.shape[-1])  # (B, n_char)
 
         window_list = []
         first_rnn_out = []
         h, c = (
-            [torch.zeros(inp.shape[1], self.memory_cells)] * 2
+            [inp.new_zeros(inp.shape[1], self.memory_cells)] * 2
             if lstm_in_states is None
             else lstm_in_states[0]
         )
@@ -206,7 +207,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             beta = -beta
             # Weights for soft-window calculation
             U = c_seq.shape[1]
-            u_seq = torch.arange(1, U + 1).float()  # shape : (U)
+            u_seq = torch.arange(1, U + 1).float().to(x.device)  # shape : (U)
             phi = ((beta * (kappa - u_seq) ** 2).exp() * alpha).sum(dim=1)  # (B, U)
 
             prev_window = (phi.unsqueeze(2) * c_seq).sum(dim=1)  # shape: (B, n_char)
@@ -260,8 +261,8 @@ class HandWritingSynthRNN(torch.nn.Module):
         # zeros matrix of required shape with batch_first = False
         samples = torch.zeros(length + 1, count, 3, device=device)
         lstm_states = None
-        window = torch.zeros(count, n_char)
-        kappa = torch.zeros(count, self.n_gaussians_window, 1)
+        window = torch.zeros(count, n_char, device=device)
+        kappa = torch.zeros(count, self.n_gaussians_window, 1, device=device)
 
         for i in range(1, length + 1):
             # get distribution parameters
