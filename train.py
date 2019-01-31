@@ -161,7 +161,7 @@ def train(device, batch_size, data_path="data/", uncond=False):
     with open(data_path + "sentences.txt") as f:
         sentences = f.readlines()
     sentences = [snt.replace("\n", "") for snt in sentences]
-    # Instead of removing the newline symbols should it instead be used
+    # Instead of removing the newline symbols should it be used instead
 
     MAX_STROKE_LEN = 1000
     strokes, sentences, MAX_SENTENCE_LEN = filter_long_strokes(
@@ -200,14 +200,15 @@ def train(device, batch_size, data_path="data/", uncond=False):
         dataset_validn, batch_size=batch_size, shuffle=True, drop_last=False
     )
 
-    model = HandWritingSynthRNN(
-        batch_size=batch_size,
-        n_char=N_CHAR,
-        max_stroke_len=MAX_STROKE_LEN,
-        max_sentence_len=MAX_SENTENCE_LEN,
+    model = (
+        HandWritingRNN()
+        if uncond
+        else HandWritingSynthRNN(
+            n_char=N_CHAR,
+            max_stroke_len=MAX_STROKE_LEN,
+            max_sentence_len=MAX_SENTENCE_LEN,
+        )
     )
-    if uncond:
-        model = HandWritingRNN()
 
     if device != torch.device("cpu"):
         model = model.cuda()
@@ -237,7 +238,7 @@ def train(device, batch_size, data_path="data/", uncond=False):
             if uncond:
                 inputs = (inp_x,)
 
-            e, pi, mu, sigma, rho, _, _, _ = model(*inputs)
+            e, pi, mu, sigma, rho, *_ = model(*inputs)
 
             loss = criterion(x, e, pi, mu, sigma, rho, masks)
             train_losses.append(loss.detach().cpu().numpy())
@@ -268,7 +269,7 @@ def train(device, batch_size, data_path="data/", uncond=False):
         sentences = ["Welcome to Lyrebird"] + ["Hello World"] * (sample_count - 1)
         sentences = [s.to(device) for s in oh_encoder.one_hot(sentences)]
         generated_samples = (
-            model.generate(length=600, count=sample_count, device=device)
+            model.generate(length=600, batch=sample_count, device=device)
             if uncond
             else model.generate(sentences=sentences, device=device)
         )

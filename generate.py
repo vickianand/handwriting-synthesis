@@ -28,7 +28,7 @@ def generate_from_model(
     handWritingRNN.load_state_dict(torch.load(model_file, map_location=device))
     handWritingRNN.to(device)
     generated_samples = handWritingRNN.generate(
-        device=device, length=sample_length, count=num_sample
+        device=device, length=sample_length, batch=num_sample
     )
 
     for i in range(num_sample):
