@@ -28,9 +28,9 @@ class HandWritingData(Dataset):
         input:
             strokes: list having N tensors of dimensions (*, d)
         output:
-            padded_strokes: tensor of padded sequences of dimension (T, N, d) where 
+            padded_strokes: tensor of padded sequences of dimension (T, N, d) where
                 T is the length of the longest tensor.
-            masks: tensor of same dimension as strokes but having value 0 at 
+            masks: tensor of same dimension as strokes but having value 0 at
                 positions where padding was done and value 1 at all other places
         """
         # first pad strokes and create masks corresponding to it
@@ -83,24 +83,20 @@ def mog_density_2d(x, pi, mu, sigma, rho):
         sigma : (n , m, 2)
         rho : (n, m)
     """
-    m = pi.shape[1]
-    x_c = mu.new_zeros(mu.shape)  # x (_centered) is of shape : (n, m, 2)
-    for i in range(m):
-        x_c[:, i, :] = x - mu[:, i, :]
+    x_c = (x.unsqueeze(1) - mu) / sigma
 
-    z = (
-        x_c[:, :, 0] ** 2 / sigma[:, :, 0] ** 2
-        + x_c[:, :, 1] ** 2 / sigma[:, :, 1] ** 2
-        - 2 * rho * x_c[:, :, 0] * x_c[:, :, 1] / (sigma[:, :, 0] * sigma[:, :, 1])
-    )
+    z = (x_c ** 2).sum(dim=2) - 2 * rho * x_c[:, :, 0] * x_c[:, :, 1]
 
-    densities = torch.exp(-z / 2 * (1 - rho ** 2)) / (
-        2 * math.pi * sigma[:, :, 0] * sigma[:, :, 1] * torch.sqrt(1 - rho ** 2)
-    )
+    log_densities = (-z / 2 * (1 - rho ** 2)) - \
+        (np.log(2 * math.pi) + sigma[:, :, 0].log() + sigma[:, :, 1].log() +
+         0.5*(1 - rho ** 2).log()) + pi.log()
+    # dimensions - log_densities : (n, m)
 
-    # dimensions - densities : (n, m); pi : (n, m)
-    # aggregate along dimension 1, by weighing with pi and return tensor of shape (n)
-    return (pi * densities).sum(dim=1)
+    # log_sum_exp trick for stability; return tensor of shape (n,)
+    max_ld = log_densities.max(dim=1, keepdim=True)[0]
+    log_densities = max_ld + (log_densities - max_ld).exp().sum().log()
+
+    return log_densities
 
 
 def criterion(x, e, pi, mu, sigma, rho, masks):
@@ -115,7 +111,7 @@ def criterion(x, e, pi, mu, sigma, rho, masks):
         rho: (n, b, m)
     Here n is the sequence length and m in number of components assumed for MoG
     """
-    n, b, m = pi.shape
+    n, b, m = pi.shape  # n=sequence_length, b=batch_size, m=number_of_component_in_MoG
 
     x = x.contiguous().view(n * b, 3)
     e = e.view(n * b)
@@ -136,10 +132,12 @@ def criterion(x, e, pi, mu, sigma, rho, masks):
         sigma2d[:, :, 1, 0] = sigma2d[:, :, 0, 1]
     """
     # add small constant for numerical stability
-    density = mog_density_2d(x, pi, mu, sigma, rho) + 1e-8
+    log_density = mog_density_2d(x, pi, mu, sigma, rho) + 1e-8
 
     masks = masks.view(n * b)
-    ll = ((torch.log(density) + torch.log(e)) * masks).mean()  # final log-likelihood
+    ll = ((log_density + e.log()) * masks).mean()  # final log-likelihood
+    # .mean() may be wrong because if we do .mean() the for different
+    # length sequence denominator is always same
     return -ll
 
 
@@ -266,7 +264,8 @@ def train(device, batch_size, data_path="data/", uncond=False):
 
         # generate samples from model
         sample_count = 2
-        sentences = ["Welcome to Lyrebird"] + ["Hello World"] * (sample_count - 1)
+        sentences = ["Welcome to Lyrebird"] + \
+            ["Hello World"] * (sample_count - 1)
         sentences = [s.to(device) for s in oh_encoder.one_hot(sentences)]
         generated_samples = (
             model.generate(length=600, batch=sample_count, device=device)
@@ -286,7 +285,8 @@ def train(device, batch_size, data_path="data/", uncond=False):
 
 def main():
 
-    parser = argparse.ArgumentParser(description="Train a handwriting generation model")
+    parser = argparse.ArgumentParser(
+        description="Train a handwriting generation model")
     parser.add_argument(
         "--uncond",
         help="If want to train the unconditional model",
@@ -315,4 +315,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
