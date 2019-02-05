@@ -60,10 +60,11 @@ class HandWritingRNN(torch.nn.Module):
         #     y.register_hook(lambda x: x.clamp(min=-10, max=0.10))
 
         pi = self.softmax(y[:, :, : self.n_gaussians])
-        mu = y[:, :, self.n_gaussians : 3 * self.n_gaussians]
-        sigma = torch.exp(y[:, :, 3 * self.n_gaussians : 5 * self.n_gaussians])
+        mu = y[:, :, self.n_gaussians: 3 * self.n_gaussians]
+        sigma = torch.exp(y[:, :, 3 * self.n_gaussians: 5 * self.n_gaussians])
         # sigma = y[:, :, 3*self.n_gaussians:5*self.n_gaussians]
-        rho = self.tanh(y[:, :, 5 * self.n_gaussians : 6 * self.n_gaussians]) * 0.9
+        rho = self.tanh(
+            y[:, :, 5 * self.n_gaussians: 6 * self.n_gaussians])  # * 0.9
         e = self.sigmoid(y[:, :, 6 * self.n_gaussians])
 
         return e, pi, mu, sigma, rho, lstm_out_states
@@ -72,14 +73,15 @@ class HandWritingRNN(torch.nn.Module):
         """
         Get a random sample from the distribution (model)
         """
-        samples = torch.zeros(length + 1, batch, 3, device=device)  # batch_first=false
+        samples = torch.zeros(length + 1, batch, 3,
+                              device=device)  # batch_first=false
         lstm_states = None
 
         for i in range(1, length + 1):
             # get distribution parameters
             with torch.no_grad():
                 e, pi, mu, sigma, rho, lstm_states = self.forward(
-                    samples[i - 1 : i], lstm_states
+                    samples[i - 1: i], lstm_states
                 )
             # sample from the distribution (returned parameters)
             # samples[i, :, 0] = e[-1, :] > 0.5
@@ -91,7 +93,8 @@ class HandWritingRNN(torch.nn.Module):
             selected_mode = distrbn2.sample()
 
             index_1 = selected_mode.unsqueeze(1)  # shape (batch, 1)
-            index_2 = torch.stack([index_1, index_1], dim=2)  # shape (batch, 1, 2)
+            # shape (batch, 1, 2)
+            index_2 = torch.stack([index_1, index_1], dim=2)
 
             mu = (
                 mu[-1]
@@ -181,7 +184,8 @@ class HandWritingSynthRNN(torch.nn.Module):
         """
 
         if prev_window is None:
-            prev_window = inp.new_zeros(inp.shape[1], c_seq.shape[-1])  # (B, n_char)
+            prev_window = inp.new_zeros(
+                inp.shape[1], c_seq.shape[-1])  # (B, n_char)
 
         window_list = []
         first_rnn_out = []
@@ -196,22 +200,26 @@ class HandWritingSynthRNN(torch.nn.Module):
             first_rnn_out.append(h)
             # Paramters for soft-window calculation
             window_params = self.h_to_w(h).exp()  # (B, 3*K)
-            alpha, beta, kappa = window_params.unsqueeze(-1).chunk(chunks=3, dim=1)
+            alpha, beta, kappa = window_params.unsqueeze(
+                -1).chunk(chunks=3, dim=1)
             # shape : (B, K=10, 1); unsqueeze() for broadcasting into (B, K, U)
             kappa += prev_kappa
             beta = -beta
             # Weights for soft-window calculation
             U = c_seq.shape[1]
             u_seq = torch.arange(1, U + 1).float().to(x.device)  # shape : (U)
-            phi = ((beta * (kappa - u_seq) ** 2).exp() * alpha).sum(dim=1)  # (B, U)
+            phi = ((beta * (kappa - u_seq) ** 2).exp()
+                   * alpha).sum(dim=1)  # (B, U)
 
-            prev_window = (phi.unsqueeze(2) * c_seq).sum(dim=1)  # shape: (B, n_char)
+            # shape: (B, n_char)
+            prev_window = (phi.unsqueeze(2) * c_seq).sum(dim=1)
             window_list.append(prev_window)
             prev_kappa = kappa
 
         # save the output and states of first_rnn (LSTMCell module) in
         # the format of returned value of an LSTM module
-        rnn_out = [(torch.stack(first_rnn_out, dim=0), (h, c))]  # [(T, B, memory_cell)]
+        # [(T, B, memory_cell)]
+        rnn_out = [(torch.stack(first_rnn_out, dim=0), (h, c))]
         window = torch.stack(window_list, dim=0)  # (T, B, memory_cell)
 
         # Running rest of the rnn layers
@@ -232,10 +240,11 @@ class HandWritingSynthRNN(torch.nn.Module):
         #     y.register_hook(lambda x: x.clamp(min=-10, max=0.10))  # does it work?
 
         pi = self.softmax(y[:, :, : self.n_gaussians])
-        mu = y[:, :, self.n_gaussians : 3 * self.n_gaussians]
-        sigma = torch.exp(y[:, :, 3 * self.n_gaussians : 5 * self.n_gaussians])
+        mu = y[:, :, self.n_gaussians: 3 * self.n_gaussians]
+        sigma = torch.exp(y[:, :, 3 * self.n_gaussians: 5 * self.n_gaussians])
         # sigma = y[:, :, 3*self.n_gaussians:5*self.n_gaussians]
-        rho = self.tanh(y[:, :, 5 * self.n_gaussians : 6 * self.n_gaussians])  # * 0.9
+        rho = self.tanh(
+            y[:, :, 5 * self.n_gaussians: 6 * self.n_gaussians])  # * 0.9
         e = self.sigmoid(y[:, :, 6 * self.n_gaussians])
 
         return e, pi, mu, sigma, rho, lstm_out_states, prev_window, prev_kappa
@@ -263,7 +272,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             # get distribution parameters
             with torch.no_grad():
                 e, pi, mu, sigma, rho, lstm_states, window, kappa = self.forward(
-                    samples[i - 1 : i], c_seq, lstm_states, window, kappa
+                    samples[i - 1: i], c_seq, lstm_states, window, kappa
                 )
             # sample from the distribution (returned parameters)
             # samples[i, :, 0] = e[-1, :] > 0.5
@@ -275,7 +284,8 @@ class HandWritingSynthRNN(torch.nn.Module):
             selected_mode = distrbn2.sample()
 
             index_1 = selected_mode.unsqueeze(1)  # shape (batch, 1)
-            index_2 = torch.stack([index_1, index_1], dim=2)  # shape (batch, 1, 2)
+            # shape (batch, 1, 2)
+            index_2 = torch.stack([index_1, index_1], dim=2)
 
             mu = (
                 mu[-1]
