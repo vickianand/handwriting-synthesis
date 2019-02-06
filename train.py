@@ -87,7 +87,7 @@ def mog_density_2d(x, pi, mu, sigma, rho):
 
     z = (x_c ** 2).sum(dim=2) - 2 * rho * x_c[:, :, 0] * x_c[:, :, 1]
 
-    log_densities = (-z / 2 * (1 - rho ** 2)) - \
+    log_densities = (-z / (2 * (1 - rho ** 2))) - \
         (np.log(2 * math.pi) + sigma[:, :, 0].log() + sigma[:, :, 1].log() +
          0.5*(1 - rho ** 2).log()) + pi.log()
     # dimensions - log_densities : (n, m)
