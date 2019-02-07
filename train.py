@@ -114,18 +114,21 @@ def criterion(x, e, pi, mu, sigma, rho, masks):
         masks: (n, b)
     Here n is the sequence length and m in number of components assumed for MoG
     """
+    epsillon = 1e-4
     n, b, m = pi.shape  # n=sequence_length, b=batch_size, m=number_of_component_in_MoG
 
+    # change dimensions to (n*b, *) from (n, b, *)
     x = x.contiguous().view(n * b, 3)
     e = e.view(n * b)
     e = e * x[:, 0] + (1 - e) * (1 - x[:, 0])  # e = (x0 == 1) ? e : (1 - e)
+    e = (e + epsillon)/(1 + 2*epsillon)
 
     x = x[:, 1:3]  # 2-dimensional offset values which is needed for MoG density
 
-    pi = pi.view(n * b, m)  # change dimension to (n*b, m) from (n, b, m)
+    pi = pi.view(n * b, m)
     mu = mu.view(n * b, m, 2)
-    sigma = sigma.view(n * b, m, 2)
-    rho = rho.view(n * b, m)
+    sigma = sigma.view(n * b, m, 2) + epsillon
+    rho = rho.view(n * b, m) / (1 + epsillon)
 
     """
         sigma2d = sigma.zeros(n, m, 4)
