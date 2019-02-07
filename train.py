@@ -199,18 +199,21 @@ def train(device, batch_size, data_path="data/", uncond=False):
         dataset_validn, batch_size=batch_size, shuffle=True, drop_last=False
     )
 
+    common_model_structure = {"memory_cells": 400,
+                              "n_gaussians": 20, "num_layers": 3}
     model = (
-        HandWritingRNN()
+        HandWritingRNN(**common_model_structure).to(device)
         if uncond
         else HandWritingSynthRNN(
             n_char=N_CHAR,
             max_stroke_len=MAX_STROKE_LEN,
             max_sentence_len=MAX_SENTENCE_LEN,
-        )
+            n_gaussians_window=10,
+            **common_model_structure
+        ).to(device)
     )
 
-    if device != torch.device("cpu"):
-        model = model.cuda()
+    model.init_params()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=0)
     # optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-2,

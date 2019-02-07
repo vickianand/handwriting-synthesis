@@ -1,3 +1,4 @@
+from itertools import chain
 import torch
 from torch.distributions import MultivariateNormal, Bernoulli, Categorical
 
@@ -68,6 +69,18 @@ class HandWritingRNN(torch.nn.Module):
         e = self.sigmoid(y[:, :, 6 * self.n_gaussians])
 
         return e, pi, mu, sigma, rho, lstm_out_states
+
+    def init_params(self):
+        for param in self.rnns.parameters():
+            if param.dim() == 1:
+                torch.nn.init.uniform_(param, -1e-2, 1e-2)
+            else:
+                torch.nn.init.orthogonal_(param)
+        for param in self.last_layer.parameters():
+            if param.dim() == 1:
+                torch.nn.init.uniform_(param, -1e-2, 1e-2)
+            else:
+                torch.nn.init.xavier_uniform_(param)
 
     def generate(self, length=300, batch=1, device=torch.device("cpu")):
         """
@@ -312,3 +325,15 @@ class HandWritingSynthRNN(torch.nn.Module):
             samples[i, :, 1:] = distribn.sample()
 
         return samples[1:, :, :]  # remove dummy first zeros
+
+    def init_params(self):
+        for param in chain(self.first_rnn.parameters(), self.rnns.parameters()):
+            if param.dim() == 1:
+                torch.nn.init.uniform_(param, -1e-2, 1e-2)
+            else:
+                torch.nn.init.orthogonal_(param)
+        for param in chain(self.last_layer.parameters(), self.h_to_w.parameters()):
+            if param.dim() == 1:
+                torch.nn.init.uniform_(param, -1e-2, 1e-2)
+            else:
+                torch.nn.init.xavier_uniform_(param)
