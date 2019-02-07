@@ -82,6 +82,8 @@ def mog_density_2d(x, pi, mu, sigma, rho):
         mu : (n , m, 2)
         sigma : (n , m, 2)
         rho : (n, m)
+    Returns:
+        log_densities : (n,)
     """
     x_c = (x.unsqueeze(1) - mu) / sigma
 
@@ -94,7 +96,7 @@ def mog_density_2d(x, pi, mu, sigma, rho):
 
     # log_sum_exp trick for stability; return tensor of shape (n,)
     max_ld = log_densities.max(dim=1, keepdim=True)[0]
-    log_densities = max_ld + (log_densities - max_ld).exp().sum().log()
+    log_densities = max_ld.squeeze() + (log_densities - max_ld).exp().sum(dim=1).log()
 
     return log_densities
 
@@ -108,7 +110,8 @@ def criterion(x, e, pi, mu, sigma, rho, masks):
         pi: (n, b, m)
         mu: (n, b, 2*m)
         sigma: (n, b, 2*m)
-        rho: (n, b, m)
+        rho: (n, b, m),
+        masks: (n, b)
     Here n is the sequence length and m in number of components assumed for MoG
     """
     n, b, m = pi.shape  # n=sequence_length, b=batch_size, m=number_of_component_in_MoG
@@ -135,9 +138,7 @@ def criterion(x, e, pi, mu, sigma, rho, masks):
     log_density = mog_density_2d(x, pi, mu, sigma, rho) + 1e-8
 
     masks = masks.view(n * b)
-    ll = ((log_density + e.log()) * masks).mean()  # final log-likelihood
-    # .mean() may be wrong because if we do .mean() the for different
-    # length sequence denominator is always same
+    ll = ((log_density + e.log()) * masks).sum() / masks.sum()
     return -ll
 
 
@@ -295,7 +296,7 @@ def main():
         default=False,
     )
     parser.add_argument(
-        "--batch_size", help="Batch size for training", type=int, default=64
+        "--batch_size", help="Batch size for training", type=int, default=16
     )
 
     args = parser.parse_args()
