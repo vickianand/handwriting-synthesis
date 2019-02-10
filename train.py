@@ -270,7 +270,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
                                   epoch*len(dataloader_train) + i)
 
         epoch_avg_loss = np.array(train_losses).mean()
-        SummaryWriter.add_scalar("Avg_loss_for_epoch", epoch_avg_loss, epoch)
+        writer.add_scalar("Avg_loss_for_epoch", epoch_avg_loss, epoch)
         print("Average training-loss for epoch {} is: {}".format(epoch, epoch_avg_loss))
 
         # save model if loss is better than previous best

@@ -56,7 +56,8 @@ class HandWritingRNN(torch.nn.Module):
         if(rnn_out[0][0].requires_grad):
             for o in rnn_out:
                 o[0].register_hook(lambda x: x.clamp(-10, 10))  # h_1 to h_n
-                o[1][1].register_hook(lambda x: x.clamp(-10, 10))  # c_n
+                # o[1][1].register_hook(lambda x: x.clamp(-10, 10))  # c_n
+                # the above clamp works on CPU but not on GPU (need to debug)
 
         # rnn_out is a list of tuples (out, (h, c))
         lstm_out_states = [o[1] for o in rnn_out]
@@ -220,6 +221,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             if(h.requires_grad):
                 h.register_hook(lambda x: x.clamp(-10, 10))
                 c.register_hook(lambda x: x.clamp(-10, 10))
+                # the above clamp works on CPU but not on GPU (need to debug)
 
             first_rnn_out.append(h)
             # Paramters for soft-window calculation
@@ -261,7 +263,8 @@ class HandWritingSynthRNN(torch.nn.Module):
         if(rnn_out[1][0].requires_grad):
             for o in rnn_out[1:]:
                 o[0].register_hook(lambda x: x.clamp(-10, 10))  # h_1 to h_n
-                o[1][1].register_hook(lambda x: x.clamp(-10, 10))  # c_n
+                # o[1][1].register_hook(lambda x: x.clamp(-10, 10))  # c_n
+                # the above clamp works on CPU but not on GPU (need to debug)
 
         # rnn_out is a list of tuples (out, (h, c))
         lstm_out_states = [o[1] for o in rnn_out]
