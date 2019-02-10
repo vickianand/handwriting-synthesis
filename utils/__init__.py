@@ -40,7 +40,42 @@ def plot_stroke(stroke, save_name=None):
     pyplot.close()
 
 
+def log_stroke(stroke, writer, epoch):
+    """
+    Logging the generated image into TensorBoardX SummaryWriter()
+    """
+    # Plot a single example.
+    f, ax = pyplot.subplots()
+
+    x = np.cumsum(stroke[:, 1])
+    y = np.cumsum(stroke[:, 2])
+
+    size_x = x.max() - x.min() + 1.0
+    size_y = y.max() - y.min() + 1.0
+
+    f.set_size_inches(5.0 * size_x / size_y, 5.0)
+
+    cuts = np.where(stroke[:, 0] == 1)[0]
+    start = 0
+
+    for cut_value in cuts:
+        ax.plot(x[start:cut_value], y[start:cut_value], "k-", linewidth=3)
+        start = cut_value + 1
+    ax.axis("equal")
+    # ax.axes.get_xaxis().set_visible(False)
+    # ax.axes.get_yaxis().set_visible(False)
+
+    f.canvas.draw()
+
+    # Now we can save it to a numpy array.
+    data = np.fromstring(f.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    data = data.reshape(f.canvas.get_width_height()[::-1] + (3,))
+    writer.add_image("Sample Image", data, epoch)
+
+
 # ======================== normalize the strokes offset ========================
+
+
 def normalize_data1(strokes):
     """
     normalize to [-1, 1] separately for x1 and x2
@@ -52,8 +87,10 @@ def normalize_data1(strokes):
     range1 = max1 - min1
     range2 = max2 - min2
     for i in range(strokes.shape[0]):
-        strokes[i][:, 1] = 2 * (strokes[i][:, 1] - (min1 + range1 / 2.0)) / range1
-        strokes[i][:, 2] = 2 * (strokes[i][:, 2] - (min2 + range2 / 2.0)) / range2
+        strokes[i][:, 1] = 2 * (strokes[i][:, 1] -
+                                (min1 + range1 / 2.0)) / range1
+        strokes[i][:, 2] = 2 * (strokes[i][:, 2] -
+                                (min2 + range2 / 2.0)) / range2
 
     return strokes
 
@@ -68,7 +105,8 @@ def normalize_data2(strokes):
     # print("min1 = {}, max1 = {}".format(min1, max1))
     range1 = max1 - min1
     for i in range(strokes.shape[0]):
-        strokes[i][:, 1:] = 2 * (strokes[i][:, 1:] - (min1 + range1 / 2.0)) / range1
+        strokes[i][:, 1:] = 2 * (strokes[i][:, 1:] -
+                                 (min1 + range1 / 2.0)) / range1
 
     return strokes
 
@@ -110,7 +148,8 @@ def filter_long_strokes(strokes, senences, stroke_len_threshold):
     """
     assert strokes.size == len(senences)
     orig_count = strokes.size
-    select_indices = np.array([s.shape[0] <= stroke_len_threshold for s in strokes])
+    select_indices = np.array(
+        [s.shape[0] <= stroke_len_threshold for s in strokes])
     strokes = strokes[select_indices]
     senences = list(np.array(senences)[select_indices])
     assert strokes.size == len(senences)
@@ -135,7 +174,8 @@ class OneHotEncoder:
         """
         self.n_char = n_char
         char_counts = Counter("".join(sentences))
-        char_counts = sorted(char_counts.items(), key=lambda x: x[1], reverse=True)
+        char_counts = sorted(char_counts.items(),
+                             key=lambda x: x[1], reverse=True)
 
         self.char_to_idx = {}
 
@@ -143,7 +183,7 @@ class OneHotEncoder:
             # for 56 most frequent characters, we give a unique id
             self.char_to_idx[char_counts[i][0]] = i
 
-        for kv in char_counts[n_char - 1 :]:
+        for kv in char_counts[n_char - 1:]:
             self.char_to_idx[kv[0]] = n_char - 1
 
     def one_hot(self, sentences):

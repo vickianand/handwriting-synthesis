@@ -52,18 +52,23 @@ class HandWritingRNN(torch.nn.Module):
                 else rnn(rnn_inp)
             )
 
+        # clip LSTM derivatives to (-10, 10)
+        if(rnn_out[0][0].requires_grad):
+            for o in rnn_out:
+                o[0].register_hook(lambda x: x.clamp(-10, 10))  # h_1 to h_n
+                o[1][1].register_hook(lambda x: x.clamp(-10, 10))  # c_n
+
         # rnn_out is a list of tuples (out, (h, c))
         lstm_out_states = [o[1] for o in rnn_out]
         rnn_out = torch.cat([o[0] for o in rnn_out], dim=2)
-        y = self.last_layer(rnn_out)
 
-        # if y.requires_grad:
-        #     y.register_hook(lambda x: x.clamp(min=-10, max=0.10))
+        y = self.last_layer(rnn_out)
+        if y.requires_grad:
+            y.register_hook(lambda x: x.clamp(min=-100, max=100))
 
         pi = self.softmax(y[:, :, : self.n_gaussians])
         mu = y[:, :, self.n_gaussians: 3 * self.n_gaussians]
         sigma = torch.exp(y[:, :, 3 * self.n_gaussians: 5 * self.n_gaussians])
-        # sigma = y[:, :, 3*self.n_gaussians:5*self.n_gaussians]
         rho = self.tanh(
             y[:, :, 5 * self.n_gaussians: 6 * self.n_gaussians])  # * 0.9
         e = self.sigmoid(y[:, :, 6 * self.n_gaussians])
@@ -210,6 +215,12 @@ class HandWritingSynthRNN(torch.nn.Module):
         for x in inp:
             rnn_inp = torch.cat((x, prev_window), dim=1)  # (B, 3+n_char)
             h, c = self.first_rnn(rnn_inp, (h, c))
+
+            # clip LSTM derivatives to (-10, 10)
+            if(h.requires_grad):
+                h.register_hook(lambda x: x.clamp(-10, 10))
+                c.register_hook(lambda x: x.clamp(-10, 10))
+
             first_rnn_out.append(h)
             # Paramters for soft-window calculation
             window_params = self.h_to_w(h).exp()  # (B, 3*K)
@@ -226,6 +237,8 @@ class HandWritingSynthRNN(torch.nn.Module):
 
             # shape: (B, n_char)
             prev_window = (phi.unsqueeze(2) * c_seq).sum(dim=1)
+            if prev_window.requires_grad:
+                prev_window.register_hook(lambda x: x.clamp(-100, 100))
             window_list.append(prev_window)
             prev_kappa = kappa
 
@@ -244,13 +257,19 @@ class HandWritingSynthRNN(torch.nn.Module):
                 else rnn(rnn_inp)
             )
 
+        # clip LSTM derivatives to (-10, 10)
+        if(rnn_out[1][0].requires_grad):
+            for o in rnn_out[1:]:
+                o[0].register_hook(lambda x: x.clamp(-10, 10))  # h_1 to h_n
+                o[1][1].register_hook(lambda x: x.clamp(-10, 10))  # c_n
+
         # rnn_out is a list of tuples (out, (h, c))
         lstm_out_states = [o[1] for o in rnn_out]
         rnn_out = torch.cat([o[0] for o in rnn_out], dim=2)
         y = self.last_layer(rnn_out)
 
-        # if y.requires_grad:
-        #     y.register_hook(lambda x: x.clamp(min=-10, max=0.10))  # does it work?
+        if y.requires_grad:
+            y.register_hook(lambda x: x.clamp(min=-100, max=100))
 
         pi = self.softmax(y[:, :, : self.n_gaussians])
         mu = y[:, :, self.n_gaussians: 3 * self.n_gaussians]

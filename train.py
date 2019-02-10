@@ -6,8 +6,9 @@ import pickle
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, SubsetRandomSampler
+from tensorboardX import SummaryWriter
 
-from utils import plot_stroke, normalize_data3, filter_long_strokes, OneHotEncoder
+from utils import plot_stroke, log_stroke, normalize_data3, filter_long_strokes, OneHotEncoder
 from model import HandWritingRNN, HandWritingSynthRNN
 
 # ------------------------------------------------------------------------------
@@ -148,10 +149,12 @@ def criterion(x, e, pi, mu, sigma, rho, masks):
 # ------------------------------------------------------------------------------
 
 
-def train(device, batch_size, data_path="data/", uncond=False):
+def train(device, batch_size, data_path="data/", uncond=False, resume=None):
     """
     """
     random_seed = 42
+
+    writer = SummaryWriter(log_dir=None, comment='')
 
     model_path = data_path + (
         "unconditional_models/" if uncond else "conditional_models/"
@@ -215,12 +218,17 @@ def train(device, batch_size, data_path="data/", uncond=False):
             **common_model_structure
         ).to(device)
     )
-
-    model.init_params()
-
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=0)
     # optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-2,
     #                                   weight_decay=0, momentum=0)
+    if resume is None:
+        model.init_params()
+    else:
+        model.load_state_dict(torch.load(resume, map_location=device))
+        print("Resuming trainig on {}".format(resume))
+        resume_optim_file = resume.split(".pt")[0] + "_optim.pt"
+        if(os.path.exists(resume_optim_file)):
+            optimizer = torch.load(resume_optim_file, map_location=device)
 
     best_epoch_avg_loss = 100
     for epoch in range(100):
@@ -252,13 +260,17 @@ def train(device, batch_size, data_path="data/", uncond=False):
 
             loss.backward()
 
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 100)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
 
             optimizer.step()
 
             print("{},\t".format(loss))
+            if(i % 10 == 0):
+                writer.add_scalar("Every_10th_batch_loss", loss,
+                                  epoch*len(dataloader_train) + i)
 
         epoch_avg_loss = np.array(train_losses).mean()
+        SummaryWriter.add_scalar("Avg_loss_for_epoch", epoch_avg_loss, epoch)
         print("Average training-loss for epoch {} is: {}".format(epoch, epoch_avg_loss))
 
         # save model if loss is better than previous best
@@ -268,6 +280,8 @@ def train(device, batch_size, data_path="data/", uncond=False):
                 ("un" if uncond else ""), epoch
             )
             torch.save(model.state_dict(), model_file)
+            optim_file = model_file.split(".pt")[0] + "_optim.pt"
+            torch.save(optimizer, optim_file)
 
         # generate samples from model
         sample_count = 2
@@ -289,6 +303,9 @@ def train(device, batch_size, data_path="data/", uncond=False):
                 ),
             )
 
+        # for i in range(sample_count):
+        #     log_stroke(generated_samples[:, i, :].cpu().numpy(), writer, epoch)
+
 
 def main():
 
@@ -303,6 +320,9 @@ def main():
     )
     parser.add_argument(
         "--batch_size", help="Batch size for training", type=int, default=16
+    )
+    parser.add_argument(
+        "--resume", help="model path from which to resume training", type=str, default=None
     )
 
     args = parser.parse_args()
