@@ -220,7 +220,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             # clip LSTM derivatives to (-10, 10)
             if(h.requires_grad):
                 h.register_hook(lambda x: x.clamp(-10, 10))
-                c.register_hook(lambda x: x.clamp(-10, 10))
+                # c.register_hook(lambda x: x.clamp(-10, 10))
                 # the above clamp works on CPU but not on GPU (need to debug)
 
             first_rnn_out.append(h)
