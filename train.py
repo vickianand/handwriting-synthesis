@@ -8,7 +8,13 @@ import torch
 from torch.utils.data import DataLoader, Dataset, SubsetRandomSampler
 from tensorboardX import SummaryWriter
 
-from utils import plot_stroke, log_stroke, normalize_data3, filter_long_strokes, OneHotEncoder
+from utils import (
+    plot_stroke,
+    log_stroke,
+    normalize_data3,
+    filter_long_strokes,
+    OneHotEncoder,
+)
 from model import HandWritingRNN, HandWritingSynthRNN
 
 # ------------------------------------------------------------------------------
@@ -64,7 +70,12 @@ class HandWritingData(Dataset):
         )
 
     def __getitem__(self, idx):
-        return self.padded_sentences[idx], self.padded_strokes[idx], self.masks[idx]
+        return (
+            self.padded_sentences[idx],
+            self.padded_strokes[idx],
+            self.masks[idx],
+            self.sentence_masks[idx],
+        )
 
     def __len__(self):
         return self.len
@@ -90,9 +101,16 @@ def mog_density_2d(x, pi, mu, sigma, rho):
 
     z = (x_c ** 2).sum(dim=2) - 2 * rho * x_c[:, :, 0] * x_c[:, :, 1]
 
-    log_densities = (-z / (2 * (1 - rho ** 2))) - \
-        (np.log(2 * math.pi) + sigma[:, :, 0].log() + sigma[:, :, 1].log() +
-         0.5*(1 - rho ** 2).log()) + pi.log()
+    log_densities = (
+        (-z / (2 * (1 - rho ** 2)))
+        - (
+            np.log(2 * math.pi)
+            + sigma[:, :, 0].log()
+            + sigma[:, :, 1].log()
+            + 0.5 * (1 - rho ** 2).log()
+        )
+        + pi.log()
+    )
     # dimensions - log_densities : (n, m)
 
     # log_sum_exp trick for stability; return tensor of shape (n,)
@@ -122,7 +140,7 @@ def criterion(x, e, pi, mu, sigma, rho, masks):
     x = x.contiguous().view(n * b, 3)
     e = e.view(n * b)
     e = e * x[:, 0] + (1 - e) * (1 - x[:, 0])  # e = (x0 == 1) ? e : (1 - e)
-    e = (e + epsillon)/(1 + 2*epsillon)
+    e = (e + epsillon) / (1 + 2 * epsillon)
 
     x = x[:, 1:3]  # 2-dimensional offset values which is needed for MoG density
 
@@ -154,7 +172,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
     """
     random_seed = 42
 
-    writer = SummaryWriter(log_dir=None, comment='')
+    writer = SummaryWriter(log_dir=None, comment="")
 
     model_path = data_path + (
         "unconditional_models/" if uncond else "conditional_models/"
@@ -205,8 +223,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
         dataset_validn, batch_size=batch_size, shuffle=True, drop_last=False
     )
 
-    common_model_structure = {"memory_cells": 400,
-                              "n_gaussians": 20, "num_layers": 3}
+    common_model_structure = {"memory_cells": 400, "n_gaussians": 20, "num_layers": 3}
     model = (
         HandWritingRNN(**common_model_structure).to(device)
         if uncond
@@ -227,7 +244,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
         model.load_state_dict(torch.load(resume, map_location=device))
         print("Resuming trainig on {}".format(resume))
         resume_optim_file = resume.split(".pt")[0] + "_optim.pt"
-        if(os.path.exists(resume_optim_file)):
+        if os.path.exists(resume_optim_file):
             optimizer = torch.load(resume_optim_file, map_location=device)
 
     best_epoch_avg_loss = 100
@@ -236,7 +253,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
         train_losses = []
         validation_iters = []
         validation_losses = []
-        for i, (c_seq, x, masks) in enumerate(dataloader_train):
+        for i, (c_seq, x, masks, c_masks) in enumerate(dataloader_train):
 
             # make batch_first = false
             x = x.permute(1, 0, 2)
@@ -247,7 +264,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
                 [x.new_zeros(1, x.shape[1], x.shape[2]), x[:-1, :, :]], dim=0
             )
 
-            inputs = (inp_x, c_seq)
+            inputs = (inp_x, c_seq, c_masks)
             if uncond:
                 inputs = (inp_x,)
 
@@ -265,9 +282,10 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
             optimizer.step()
 
             print("{},\t".format(loss))
-            if(i % 10 == 0):
-                writer.add_scalar("Every_10th_batch_loss", loss,
-                                  epoch*len(dataloader_train) + i)
+            if i % 10 == 0:
+                writer.add_scalar(
+                    "Every_10th_batch_loss", loss, epoch * len(dataloader_train) + i
+                )
 
         epoch_avg_loss = np.array(train_losses).mean()
         writer.add_scalar("Avg_loss_for_epoch", epoch_avg_loss, epoch)
@@ -285,8 +303,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
 
         # generate samples from model
         sample_count = 2
-        sentences = ["Welcome to Lyrebird"] + \
-            ["Hello World"] * (sample_count - 1)
+        sentences = ["Welcome to Lyrebird"] + ["Hello World"] * (sample_count - 1)
         sentences = [s.to(device) for s in oh_encoder.one_hot(sentences)]
         generated_samples = (
             model.generate(length=600, batch=sample_count, device=device)
@@ -309,8 +326,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
 
 def main():
 
-    parser = argparse.ArgumentParser(
-        description="Train a handwriting generation model")
+    parser = argparse.ArgumentParser(description="Train a handwriting generation model")
     parser.add_argument(
         "--uncond",
         help="If want to train the unconditional model",
@@ -322,7 +338,10 @@ def main():
         "--batch_size", help="Batch size for training", type=int, default=16
     )
     parser.add_argument(
-        "--resume", help="model path from which to resume training", type=str, default=None
+        "--resume",
+        help="model path from which to resume training",
+        type=str,
+        default=None,
     )
 
     args = parser.parse_args()
