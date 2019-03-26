@@ -145,12 +145,12 @@ def filter_long_strokes(strokes, senences, stroke_len_threshold, max_index=None)
         max_index: (Optional[int]) Index till which the data will be considered
     """
     assert strokes.size == len(senences)
-    orig_count = strokes.size
+    orig_count = strokes.size if max_index is None else max_index
     select_indices = np.array([s.shape[0] <= stroke_len_threshold for s in strokes])
     if max_index is not None:
         select_indices = np.array(
             [
-                (s.shape[0] <= stroke_len_threshold and i < 100)
+                (s.shape[0] <= stroke_len_threshold and i < max_index)
                 for i, s in enumerate(strokes)
             ]
         )

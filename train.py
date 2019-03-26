@@ -188,7 +188,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
 
     MAX_STROKE_LEN = 1000
     strokes, sentences, MAX_SENTENCE_LEN = filter_long_strokes(
-        strokes, sentences, MAX_STROKE_LEN
+        strokes, sentences, MAX_STROKE_LEN, max_index=None
     )
     # print("Max sentence len after filter is: {}".format(MAX_SENTENCE_LEN))
     N_CHAR = 57  # dimension of one-hot representation
