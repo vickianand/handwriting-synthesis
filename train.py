@@ -205,7 +205,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
     dataset = HandWritingData(sentences_oh, tstrokes)
 
     # validating the padding lengths
-    assert dataset.strokes_padded_len == MAX_STROKE_LEN
+    assert dataset.strokes_padded_len <= MAX_STROKE_LEN
     assert dataset.sentences_padded_len == MAX_SENTENCE_LEN
 
     # train - validation split

@@ -32,8 +32,7 @@ def generate_from_model(
     for i in range(num_sample):
         plot_stroke(
             generated_samples[:, i, :].cpu().numpy(),
-            save_name="data/samples/{}_{}.png".format(
-                model_name.replace(".pt", ""), i),
+            save_name="data/samples/{}_{}.png".format(model_name.replace(".pt", ""), i),
         )
 
 
@@ -71,8 +70,7 @@ def main():
         nargs="+",
         default=[93],
     )
-    parser.add_argument("-sl", "--sample_length",
-                        dest="sl", default=600, type=int)
+    parser.add_argument("-sl", "--sample_length", dest="sl", default=600, type=int)
     parser.add_argument("-ns", "--num_sample", dest="ns", default=2, type=int)
 
     args = vars(parser.parse_args())
@@ -100,4 +98,5 @@ def main():
 
 if __name__ == "__main__":
     # main()
-    generate_from_synth_model(model_name="handwriting_cond_ep0.pt")
+    # generate_from_synth_model(model_name="handwriting_cond_ep1.pt")
+    generate_from_synth_model(model_name="none")

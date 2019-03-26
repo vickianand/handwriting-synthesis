@@ -68,7 +68,7 @@ def log_stroke(stroke, writer, epoch):
     f.canvas.draw()
 
     # Now we can save it to a numpy array.
-    data = np.fromstring(f.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    data = np.fromstring(f.canvas.tostring_rgb(), dtype=np.uint8, sep="")
     data = data.reshape(f.canvas.get_width_height()[::-1] + (3,))
     writer.add_image("Sample Image", data, epoch)
 
@@ -87,10 +87,8 @@ def normalize_data1(strokes):
     range1 = max1 - min1
     range2 = max2 - min2
     for i in range(strokes.shape[0]):
-        strokes[i][:, 1] = 2 * (strokes[i][:, 1] -
-                                (min1 + range1 / 2.0)) / range1
-        strokes[i][:, 2] = 2 * (strokes[i][:, 2] -
-                                (min2 + range2 / 2.0)) / range2
+        strokes[i][:, 1] = 2 * (strokes[i][:, 1] - (min1 + range1 / 2.0)) / range1
+        strokes[i][:, 2] = 2 * (strokes[i][:, 2] - (min2 + range2 / 2.0)) / range2
 
     return strokes
 
@@ -105,8 +103,7 @@ def normalize_data2(strokes):
     # print("min1 = {}, max1 = {}".format(min1, max1))
     range1 = max1 - min1
     for i in range(strokes.shape[0]):
-        strokes[i][:, 1:] = 2 * (strokes[i][:, 1:] -
-                                 (min1 + range1 / 2.0)) / range1
+        strokes[i][:, 1:] = 2 * (strokes[i][:, 1:] - (min1 + range1 / 2.0)) / range1
 
     return strokes
 
@@ -139,25 +136,31 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-def filter_long_strokes(strokes, senences, stroke_len_threshold):
+def filter_long_strokes(strokes, senences, stroke_len_threshold, max_index=None):
     """
     arguments:
-        strokes: nump.ndarray of nump.ndarray
-        senences: list of strings
-        stroke_len_threshold: int
+        strokes: (np.ndarray)
+        senences: (List[str]))
+        stroke_len_threshold: (int)
+        max_index: (Optional[int]) Index till which the data will be considered
     """
     assert strokes.size == len(senences)
     orig_count = strokes.size
-    select_indices = np.array(
-        [s.shape[0] <= stroke_len_threshold for s in strokes])
+    select_indices = np.array([s.shape[0] <= stroke_len_threshold for s in strokes])
+    if max_index is not None:
+        select_indices = np.array(
+            [
+                (s.shape[0] <= stroke_len_threshold and i < 100)
+                for i, s in enumerate(strokes)
+            ]
+        )
     strokes = strokes[select_indices]
     senences = list(np.array(senences)[select_indices])
     assert strokes.size == len(senences)
     final_count = strokes.size
     print(
-        "Filtered long strokes: original count = {}, final count = {}".format(
-            orig_count, final_count
-        )
+        f"Filtered strokes longer than {stroke_len_threshold}: original count = "
+        f"{orig_count}, final count = {final_count}"
     )
     max_sentence_len = max([len(s) for s in senences])
     return strokes, senences, max_sentence_len
@@ -174,8 +177,7 @@ class OneHotEncoder:
         """
         self.n_char = n_char
         char_counts = Counter("".join(sentences))
-        char_counts = sorted(char_counts.items(),
-                             key=lambda x: x[1], reverse=True)
+        char_counts = sorted(char_counts.items(), key=lambda x: x[1], reverse=True)
 
         self.char_to_idx = {}
 
@@ -183,7 +185,7 @@ class OneHotEncoder:
             # for 56 most frequent characters, we give a unique id
             self.char_to_idx[char_counts[i][0]] = i
 
-        for kv in char_counts[n_char - 1:]:
+        for kv in char_counts[n_char - 1 :]:
             self.char_to_idx[kv[0]] = n_char - 1
 
     def one_hot(self, sentences):
