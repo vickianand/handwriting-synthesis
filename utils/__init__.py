@@ -76,55 +76,13 @@ def log_stroke(stroke, writer, epoch):
 # ======================== normalize the strokes offset ========================
 
 
-def normalize_data1(strokes):
-    """
-    normalize to [-1, 1] separately for x1 and x2
-    """
-    strokes_cat = np.concatenate(list(strokes))
-
-    (min1, max1) = strokes_cat[:, 1].min(), strokes_cat[:, 1].max()
-    (min2, max2) = strokes_cat[:, 2].min(), strokes_cat[:, 2].max()
-    range1 = max1 - min1
-    range2 = max2 - min2
-    for i in range(strokes.shape[0]):
-        strokes[i][:, 1] = 2 * (strokes[i][:, 1] - (min1 + range1 / 2.0)) / range1
-        strokes[i][:, 2] = 2 * (strokes[i][:, 2] - (min2 + range2 / 2.0)) / range2
-
-    return strokes
-
-
-def normalize_data2(strokes):
-    """
-    normalize to [-1, 1] range using combined min and max of x1 and x2
-    """
-    strokes_cat = np.concatenate(list(strokes))
-
-    (min1, max1) = strokes_cat[:, 1:].min(), strokes_cat[:, 1:].max()
-    # print("min1 = {}, max1 = {}".format(min1, max1))
-    range1 = max1 - min1
-    for i in range(strokes.shape[0]):
-        strokes[i][:, 1:] = 2 * (strokes[i][:, 1:] - (min1 + range1 / 2.0)) / range1
-
-    return strokes
-
-
-def normalize_data3(strokes):
+def normalize_data(strokes):
     """
     normalize to mean 0 and standard deviation 1
     """
-    strokes_cat = np.concatenate(list(strokes))
-
-    (mean, std) = strokes_cat[:, 1:].mean(), strokes_cat[:, 1:].std()
-
-    # (mean1, std1) = strokes_cat[:, 1].mean(), strokes_cat[:, 1].std()
-    # (mean2, std2) = strokes_cat[:, 2].mean(), strokes_cat[:, 2].std()
-
     for i in range(strokes.shape[0]):
-        # strokes[i][:, 1:] = (strokes[i][:, 1:] - mean) / std
-        strokes[i][:, 1:] = strokes[i][:, 1:] / std
-
-        # strokes[i][:, 1] = (strokes[i][:, 1] - mean1) / std1
-        # strokes[i][:, 2] = (strokes[i][:, 2] - mean2) / std2
+        strokes[i][:, 1] = strokes[i][:, 1] / strokes[i][:, 1].std()
+        strokes[i][:, 2] = strokes[i][:, 2] / strokes[i][:, 2].std()
 
     return strokes
 

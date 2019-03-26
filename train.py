@@ -11,7 +11,7 @@ from tensorboardX import SummaryWriter
 from utils import (
     plot_stroke,
     log_stroke,
-    normalize_data3,
+    normalize_data,
     filter_long_strokes,
     OneHotEncoder,
 )
@@ -197,8 +197,8 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
     sentences_oh = [s.to(device) for s in oh_encoder.one_hot(sentences)]
 
     # normalize strokes data and convert to pytorch tensors
-    strokes = normalize_data3(strokes)
-    # plot_stroke(strokes[sample_idx])
+    strokes = normalize_data(strokes)
+    # plot_stroke(strokes[1])
     tstrokes = [torch.from_numpy(stroke).to(device) for stroke in strokes]
 
     # pytorch dataset
