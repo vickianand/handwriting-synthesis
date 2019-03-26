@@ -284,10 +284,16 @@ class HandWritingSynthRNN(torch.nn.Module):
         return:
             samples: tensor of handwritten form for the sentences
         """
+
+        # pad sentences and create generate c_masks
         c_seq = torch.nn.utils.rnn.pad_sequence(
             sentences, batch_first=True, padding_value=0.0
         )
         batch, U, n_char = c_seq.shape
+        c_masks = torch.zeros(batch, U, device=device)
+        for i, s in enumerate(sentences):
+            c_masks[i][: s.shape[0]] = 1
+
         length = 600  # this needs to change (length should not be hard-coded)
         # empty matrix of required shape with batch_first = False
         samples = torch.empty(length + 1, batch, 3, device=device)
@@ -299,7 +305,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             # get distribution parameters
             with torch.no_grad():
                 e, pi, mu, sigma, rho, lstm_states, window, kappa = self.forward(
-                    samples[i - 1 : i], c_seq, lstm_states, window, kappa
+                    samples[i - 1 : i], c_seq, c_masks, lstm_states, window, kappa
                 )
             # sample from the distribution (returned parameters)
             # samples[i, :, 0] = e[-1, :] > 0.5
