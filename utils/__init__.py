@@ -140,15 +140,16 @@ class OneHotEncoder:
         self.char_to_idx = {}
         self.idx_to_char = {}
 
-        for i in range(n_char - 1):
-            # for 56 most frequent characters, we give a unique id
-            self.char_to_idx[char_counts[i][0]] = i
-            self.idx_to_char[i] = char_counts[i][0]
-
-        for kv in char_counts[n_char - 1 :]:
-            self.char_to_idx[kv[0]] = n_char - 1
+        for i, kv in enumerate(char_counts):
+            if i < n_char - 1:
+                # for 56 most frequent characters, we give a unique id
+                self.char_to_idx[kv[0]] = i
+                self.idx_to_char[i] = kv[0]
+            else:
+                self.char_to_idx[kv[0]] = n_char - 1
 
         self.idx_to_char[n_char - 1] = "~"
+        print(self.char_to_idx, "\n\n", self.idx_to_char, "\n\n")
 
     def one_hot(self, sentences):
         """

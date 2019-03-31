@@ -193,7 +193,7 @@ def train(device, args, data_path="data/"):
     # print("Max sentence len after filter is: {}".format(MAX_SENTENCE_LEN))
 
     # dimension of one-hot representation
-    N_CHAR = 57 if args.n_data > 100 else 30
+    N_CHAR = 57
     oh_encoder = OneHotEncoder(sentences, n_char=N_CHAR)
     pickle.dump(oh_encoder, open("data/one_hot_encoder.pkl", "wb"))
     sentences_oh = [s.to(device) for s in oh_encoder.one_hot(sentences)]
