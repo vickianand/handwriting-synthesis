@@ -167,15 +167,15 @@ def criterion(x, e, log_pi, mu, sigma, rho, masks):
 # ------------------------------------------------------------------------------
 
 
-def train(device, batch_size, data_path="data/", uncond=False, resume=None):
+def train(device, args, data_path="data/"):
     """
     """
     random_seed = 42
 
-    writer = SummaryWriter(log_dir=None, comment="")
+    writer = SummaryWriter(log_dir=args.logdir, comment="")
 
-    model_path = data_path + (
-        "unconditional_models/" if uncond else "conditional_models/"
+    model_path = args.logdir + (
+        "unconditional_models/" if args.uncond else "conditional_models/"
     )
     os.makedirs(model_path, exist_ok=True)
 
@@ -188,10 +188,12 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
 
     MAX_STROKE_LEN = 1000
     strokes, sentences, MAX_SENTENCE_LEN = filter_long_strokes(
-        strokes, sentences, MAX_STROKE_LEN, max_index=None
+        strokes, sentences, MAX_STROKE_LEN, max_index=args.n_data
     )
     # print("Max sentence len after filter is: {}".format(MAX_SENTENCE_LEN))
-    N_CHAR = 57  # dimension of one-hot representation
+
+    # dimension of one-hot representation
+    N_CHAR = 57 if args.n_data > 100 else 30
     oh_encoder = OneHotEncoder(sentences, n_char=N_CHAR)
     pickle.dump(oh_encoder, open("data/one_hot_encoder.pkl", "wb"))
     sentences_oh = [s.to(device) for s in oh_encoder.one_hot(sentences)]
@@ -217,16 +219,16 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
     )
 
     dataloader_train = DataLoader(
-        dataset_train, batch_size=batch_size, shuffle=True, drop_last=False
+        dataset_train, batch_size=args.batch_size, shuffle=True, drop_last=False
     )  # last batch may be smaller than batch_size
     dataloader_validn = DataLoader(
-        dataset_validn, batch_size=batch_size, shuffle=True, drop_last=False
+        dataset_validn, batch_size=args.batch_size, shuffle=True, drop_last=False
     )
 
     common_model_structure = {"memory_cells": 400, "n_gaussians": 20, "num_layers": 3}
     model = (
         HandWritingRNN(**common_model_structure).to(device)
-        if uncond
+        if args.uncond
         else HandWritingSynthRNN(
             n_char=N_CHAR,
             max_stroke_len=MAX_STROKE_LEN,
@@ -239,12 +241,12 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=0)
     # optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-2,
     #                                   weight_decay=0, momentum=0)
-    if resume is None:
+    if args.resume is None:
         model.init_params()
     else:
-        model.load_state_dict(torch.load(resume, map_location=device))
-        print("Resuming trainig on {}".format(resume))
-        resume_optim_file = resume.split(".pt")[0] + "_optim.pt"
+        model.load_state_dict(torch.load(args.resume, map_location=device))
+        print("Resuming trainig on {}".format(args.resume))
+        resume_optim_file = args.resume.split(".pt")[0] + "_optim.pt"
         if os.path.exists(resume_optim_file):
             optimizer = torch.load(resume_optim_file, map_location=device)
 
@@ -266,7 +268,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
             )
 
             inputs = (inp_x, c_seq, c_masks)
-            if uncond:
+            if args.uncond:
                 inputs = (inp_x,)
 
             e, log_pi, mu, sigma, rho, *_ = model(*inputs)
@@ -278,6 +280,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
 
             loss.backward()
 
+            # --- this may not be needed
             torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
 
             optimizer.step()
@@ -296,7 +299,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
         if epoch_avg_loss < best_epoch_avg_loss:
             best_epoch_avg_loss = epoch_avg_loss
             model_file = model_path + "handwriting_{}cond_ep{}.pt".format(
-                ("un" if uncond else ""), epoch
+                ("un" if args.uncond else ""), epoch
             )
             torch.save(model.state_dict(), model_file)
             optim_file = model_file.split(".pt")[0] + "_optim.pt"
@@ -304,11 +307,11 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
 
         # generate samples from model
         sample_count = 2
-        sentences = ["Welcome to Lyrebird"] + ["Hello World"] * (sample_count - 1)
+        sentences = ["Welcome to lyrebird"] + ["hello world"] * (sample_count - 1)
         sentences = [s.to(device) for s in oh_encoder.one_hot(sentences)]
         generated_samples = (
             model.generate(length=600, batch=sample_count, device=device)
-            if uncond
+            if args.uncond
             else model.generate(sentences=sentences, device=device)
         )
 
@@ -316,8 +319,9 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
         for i in range(sample_count):
             plot_stroke(
                 generated_samples[:, i, :].cpu().numpy(),
-                save_name="data/training/{}cond_ep{}_{}.png".format(
-                    ("un" if uncond else ""), epoch, i
+                save_name=args.logdir
+                + "training_imgs/{}cond_ep{}_{}.png".format(
+                    ("un" if args.uncond else ""), epoch, i
                 ),
             )
 
@@ -344,6 +348,13 @@ def main():
         type=str,
         default=None,
     )
+    parser.add_argument(
+        "--logdir",
+        help="Directory to be used for logging",
+        type=str,
+        default="runs/test/",
+    )
+    parser.add_argument("--n_data", help="count of strokes to take from data", type=int)
 
     args = parser.parse_args()
 
@@ -357,7 +368,7 @@ def main():
     torch.random.manual_seed(101)
 
     # training
-    train(device=device, **vars(args))
+    train(device=device, args=args)
 
 
 if __name__ == "__main__":

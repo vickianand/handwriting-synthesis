@@ -138,13 +138,17 @@ class OneHotEncoder:
         char_counts = sorted(char_counts.items(), key=lambda x: x[1], reverse=True)
 
         self.char_to_idx = {}
+        self.idx_to_char = {}
 
         for i in range(n_char - 1):
             # for 56 most frequent characters, we give a unique id
             self.char_to_idx[char_counts[i][0]] = i
+            self.idx_to_char[i] = char_counts[i][0]
 
         for kv in char_counts[n_char - 1 :]:
             self.char_to_idx[kv[0]] = n_char - 1
+
+        self.idx_to_char[n_char - 1] = "~"
 
     def one_hot(self, sentences):
         """
@@ -156,7 +160,8 @@ class OneHotEncoder:
             one_hot_ : list of torch tensors of shapes (len(s), n_char)
         """
         sentences_idx = [
-            torch.tensor([[self.char_to_idx[c]] for c in snt]) for snt in sentences
+            torch.tensor([[self.char_to_idx.get(c, self.n_char - 1)] for c in snt])
+            for snt in sentences
         ]
 
         one_hot_ = [
