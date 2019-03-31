@@ -8,13 +8,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset, SubsetRandomSampler
 from tensorboardX import SummaryWriter
 
-from utils import (
-    plot_stroke,
-    log_stroke,
-    normalize_data,
-    filter_long_strokes,
-    OneHotEncoder,
-)
+from utils import plot_stroke, normalize_data, filter_long_strokes, OneHotEncoder
 from model import HandWritingRNN, HandWritingSynthRNN
 
 # ------------------------------------------------------------------------------
@@ -168,7 +162,7 @@ def train(device, args, data_path="data/"):
     writer = SummaryWriter(log_dir=args.logdir, comment="")
 
     model_path = args.logdir + (
-        "unconditional_models/" if args.uncond else "conditional_models/"
+        "/unconditional_models/" if args.uncond else "/conditional_models/"
     )
     os.makedirs(model_path, exist_ok=True)
 
@@ -314,7 +308,7 @@ def train(device, args, data_path="data/"):
             f = plot_stroke(
                 generated_samples[:, i, :].cpu().numpy(),
                 save_name=args.logdir
-                + "training_imgs/{}cond_ep{}_{}.png".format(
+                + "/training_imgs/{}cond_ep{}_{}.png".format(
                     ("un" if args.uncond else ""), epoch, i
                 ),
             )
