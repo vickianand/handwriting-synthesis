@@ -84,13 +84,13 @@ class HandWritingData(Dataset):
 # ------------------------------------------------------------------------------
 
 
-def mog_density_2d(x, pi, mu, sigma, rho):
+def mog_density_2d(x, log_pi, mu, sigma, rho):
     """
     Calculates The probability density of the next input x given the output vector
     as given in Eq. 23, 24 & 25 of the paper
     Expected dimensions of input:
         x : (n, 2)
-        pi : (n , m)
+        log_pi : (n , m)
         mu : (n , m, 2)
         sigma : (n , m, 2)
         rho : (n, m)
@@ -109,24 +109,23 @@ def mog_density_2d(x, pi, mu, sigma, rho):
             + sigma[:, :, 1].log()
             + 0.5 * (1 - rho ** 2).log()
         )
-        + pi.log()
+        + log_pi
     )
     # dimensions - log_densities : (n, m)
 
-    # log_sum_exp trick for stability; return tensor of shape (n,)
-    max_ld = log_densities.max(dim=1, keepdim=True)[0]
-    log_densities = max_ld.squeeze() + (log_densities - max_ld).exp().sum(dim=1).log()
+    # using torch log_sum_exp; return tensor of shape (n,)
+    log_densities = torch.logsumexp(log_densities, dim=1)
 
     return log_densities
 
 
-def criterion(x, e, pi, mu, sigma, rho, masks):
+def criterion(x, e, log_pi, mu, sigma, rho, masks):
     """
     Calculates the sequence loss as given in Eq. 26 of the paper
     Expected dimensions of input:
         x: (n, b, 3)
         e: (n, b, 1)
-        pi: (n, b, m)
+        log_pi: (n, b, m)
         mu: (n, b, 2*m)
         sigma: (n, b, 2*m)
         rho: (n, b, m),
@@ -134,7 +133,8 @@ def criterion(x, e, pi, mu, sigma, rho, masks):
     Here n is the sequence length and m in number of components assumed for MoG
     """
     epsillon = 1e-4
-    n, b, m = pi.shape  # n=sequence_length, b=batch_size, m=number_of_component_in_MoG
+    n, b, m = log_pi.shape
+    # n = sequence_length, b = batch_size, m = number_of_component_in_MoG
 
     # change dimensions to (n*b, *) from (n, b, *)
     x = x.contiguous().view(n * b, 3)
@@ -144,7 +144,7 @@ def criterion(x, e, pi, mu, sigma, rho, masks):
 
     x = x[:, 1:3]  # 2-dimensional offset values which is needed for MoG density
 
-    pi = pi.view(n * b, m)
+    log_pi = log_pi.view(n * b, m)
     mu = mu.view(n * b, m, 2)
     sigma = sigma.view(n * b, m, 2) + epsillon
     rho = rho.view(n * b, m) / (1 + epsillon)
@@ -157,7 +157,7 @@ def criterion(x, e, pi, mu, sigma, rho, masks):
         sigma2d[:, :, 1, 0] = sigma2d[:, :, 0, 1]
     """
     # add small constant for numerical stability
-    log_density = mog_density_2d(x, pi, mu, sigma, rho) + 1e-8
+    log_density = mog_density_2d(x, log_pi, mu, sigma, rho)
 
     masks = masks.view(n * b)
     ll = ((log_density + e.log()) * masks).sum() / masks.sum()
@@ -235,6 +235,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
             **common_model_structure
         ).to(device)
     )
+    print(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=0)
     # optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-2,
     #                                   weight_decay=0, momentum=0)
@@ -247,7 +248,7 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
         if os.path.exists(resume_optim_file):
             optimizer = torch.load(resume_optim_file, map_location=device)
 
-    best_epoch_avg_loss = 100
+    best_epoch_avg_loss = 1e7
     for epoch in range(100):
 
         train_losses = []
@@ -268,9 +269,9 @@ def train(device, batch_size, data_path="data/", uncond=False, resume=None):
             if uncond:
                 inputs = (inp_x,)
 
-            e, pi, mu, sigma, rho, *_ = model(*inputs)
+            e, log_pi, mu, sigma, rho, *_ = model(*inputs)
 
-            loss = criterion(x, e, pi, mu, sigma, rho, masks)
+            loss = criterion(x, e, log_pi, mu, sigma, rho, masks)
             train_losses.append(loss.detach().cpu().numpy())
 
             optimizer.zero_grad()
