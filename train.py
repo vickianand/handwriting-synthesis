@@ -177,7 +177,7 @@ def train(device, args, data_path="data/"):
     with open(data_path + "sentences.txt") as f:
         sentences = f.readlines()
     sentences = [snt.replace("\n", "") for snt in sentences]
-    # Instead of removing the newline symbols should it be used instead
+    # Instead of removing the newline symbols, should it be used instead?
 
     MAX_STROKE_LEN = 1000
     strokes, sentences, MAX_SENTENCE_LEN = filter_long_strokes(
@@ -227,7 +227,7 @@ def train(device, args, data_path="data/"):
             max_stroke_len=MAX_STROKE_LEN,
             max_sentence_len=MAX_SENTENCE_LEN,
             n_gaussians_window=10,
-            **common_model_structure
+            **common_model_structure,
         ).to(device)
     )
     print(model)
@@ -299,7 +299,7 @@ def train(device, args, data_path="data/"):
             torch.save(optimizer, optim_file)
 
         # generate samples from model
-        sample_count = 2
+        sample_count = 3
         sentences = ["Welcome to lyrebird"] + ["hello world"] * (sample_count - 1)
         sentences = [s.to(device) for s in oh_encoder.one_hot(sentences)]
         generated_samples = (
@@ -308,18 +308,20 @@ def train(device, args, data_path="data/"):
             else model.generate(sentences=sentences, device=device)
         )
 
+        figs = []
         # save png files of the generated models
         for i in range(sample_count):
-            plot_stroke(
+            f = plot_stroke(
                 generated_samples[:, i, :].cpu().numpy(),
                 save_name=args.logdir
                 + "training_imgs/{}cond_ep{}_{}.png".format(
                     ("un" if args.uncond else ""), epoch, i
                 ),
             )
+            figs.append(f)
 
-        # for i in range(sample_count):
-        #     log_stroke(generated_samples[:, i, :].cpu().numpy(), writer, epoch)
+        for i, f in enumerate(figs):
+            writer.add_figure(f"samples/image_{i}", f, epoch)
 
 
 def main():

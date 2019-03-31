@@ -84,7 +84,7 @@ class HandWritingRNN(torch.nn.Module):
             else:
                 torch.nn.init.xavier_uniform_(param)
 
-    def generate(self, length=300, batch=1, bias=0.15, device=torch.device("cpu")):
+    def generate(self, length=300, batch=1, bias=0.25, device=torch.device("cpu")):
         """
         Get a random sample from the distribution (model)
         """
@@ -284,7 +284,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             phi_list,
         )
 
-    def generate(self, sentences, bias=3.0, device=torch.device("cpu")):
+    def generate(self, sentences, bias=0.25, device=torch.device("cpu")):
         """
         Get handwritten form for given sentences
         arguments:

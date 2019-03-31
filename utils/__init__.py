@@ -37,40 +37,8 @@ def plot_stroke(stroke, save_name=None):
         except Exception:
             print("Error building image!: " + save_name)
 
-    pyplot.close()
-
-
-def log_stroke(stroke, writer, epoch):
-    """
-    Logging the generated image into TensorBoardX SummaryWriter()
-    """
-    # Plot a single example.
-    f, ax = pyplot.subplots()
-
-    x = np.cumsum(stroke[:, 1])
-    y = np.cumsum(stroke[:, 2])
-
-    size_x = x.max() - x.min() + 1.0
-    size_y = y.max() - y.min() + 1.0
-
-    f.set_size_inches(5.0 * size_x / size_y, 5.0)
-
-    cuts = np.where(stroke[:, 0] == 1)[0]
-    start = 0
-
-    for cut_value in cuts:
-        ax.plot(x[start:cut_value], y[start:cut_value], "k-", linewidth=3)
-        start = cut_value + 1
-    ax.axis("equal")
-    # ax.axes.get_xaxis().set_visible(False)
-    # ax.axes.get_yaxis().set_visible(False)
-
-    f.canvas.draw()
-
-    # Now we can save it to a numpy array.
-    data = np.fromstring(f.canvas.tostring_rgb(), dtype=np.uint8, sep="")
-    data = data.reshape(f.canvas.get_width_height()[::-1] + (3,))
-    writer.add_image("Sample Image", data, epoch)
+    # pyplot.close()
+    return f
 
 
 # ======================== normalize the strokes offset ========================
