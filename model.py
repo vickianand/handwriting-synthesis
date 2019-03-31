@@ -84,7 +84,7 @@ class HandWritingRNN(torch.nn.Module):
             else:
                 torch.nn.init.xavier_uniform_(param)
 
-    def generate(self, length=300, batch=1, device=torch.device("cpu")):
+    def generate(self, length=300, batch=1, bias=0.15, device=torch.device("cpu")):
         """
         Get a random sample from the distribution (model)
         """
@@ -103,7 +103,7 @@ class HandWritingRNN(torch.nn.Module):
             samples[i, :, 0] = distrbn1.sample()
 
             # selected_mode = torch.argmax(log_pi[-1, :, :], dim=1) # shape = (batch,)
-            distrbn2 = Categorical(log_pi[-1, :, :].exp())
+            distrbn2 = Categorical((log_pi[-1, :, :] * (1 + bias)).exp())
             selected_mode = distrbn2.sample()
 
             index_1 = selected_mode.unsqueeze(1)  # shape (batch, 1)
@@ -117,7 +117,7 @@ class HandWritingRNN(torch.nn.Module):
                 .squeeze()
             )
             sigma = (
-                sigma[-1]
+                (sigma[-1] / torch.exp(torch.tensor(1 + bias)))
                 .view(batch, self.n_gaussians, 2)
                 .gather(dim=1, index=index_2)
                 .squeeze()
@@ -284,7 +284,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             phi_list,
         )
 
-    def generate(self, sentences, device=torch.device("cpu")):
+    def generate(self, sentences, bias=3.0, device=torch.device("cpu")):
         """
         Get handwritten form for given sentences
         arguments:
@@ -323,7 +323,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             samples[i, :, 0] = distrbn1.sample()
 
             # selected_mode = torch.argmax(log_pi[-1, :, :], dim=1) # shape = (batch,)
-            distrbn2 = Categorical(log_pi[-1, :, :].exp())
+            distrbn2 = Categorical((log_pi[-1, :, :] * (1 + bias)).exp())
             selected_mode = distrbn2.sample()
 
             index_1 = selected_mode.unsqueeze(1)  # shape (batch, 1)
@@ -337,7 +337,7 @@ class HandWritingSynthRNN(torch.nn.Module):
                 .squeeze()
             )
             sigma = (
-                sigma[-1]
+                (sigma[-1] / torch.exp(torch.tensor(1 + bias)))
                 .view(batch, self.n_gaussians, 2)
                 .gather(dim=1, index=index_2)
                 .squeeze()

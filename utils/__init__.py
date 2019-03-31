@@ -149,7 +149,7 @@ class OneHotEncoder:
                 self.char_to_idx[kv[0]] = n_char - 1
 
         self.idx_to_char[n_char - 1] = "~"
-        print(self.char_to_idx, "\n\n", self.idx_to_char, "\n\n")
+        # print(self.char_to_idx, "\n\n", self.idx_to_char, "\n\n")
 
     def one_hot(self, sentences):
         """

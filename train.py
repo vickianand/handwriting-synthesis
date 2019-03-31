@@ -149,13 +149,6 @@ def criterion(x, e, log_pi, mu, sigma, rho, masks):
     sigma = sigma.view(n * b, m, 2) + epsillon
     rho = rho.view(n * b, m) / (1 + epsillon)
 
-    """
-        sigma2d = sigma.zeros(n, m, 4)
-        sigma2d[:, :, 0, 0] = sigma[:, :, 0]**2
-        sigma2d[:, :, 1, 1] = sigma[:, :, 1]**2
-        sigma2d[:, :, 0, 1] = rho[:, :, ] * sigma[:, :, 0] * sigma[:, :, 1]
-        sigma2d[:, :, 1, 0] = sigma2d[:, :, 0, 1]
-    """
     # add small constant for numerical stability
     log_density = mog_density_2d(x, log_pi, mu, sigma, rho)
 
