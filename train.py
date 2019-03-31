@@ -237,7 +237,7 @@ def train(device, args, data_path="data/"):
         if os.path.exists(resume_optim_file):
             optimizer = torch.load(resume_optim_file, map_location=device)
 
-    best_epoch_avg_loss = 1e7
+    best_batch_loss = 1e7
     for epoch in range(100):
 
         train_losses = []
@@ -272,25 +272,35 @@ def train(device, args, data_path="data/"):
 
             optimizer.step()
 
+            # do logging
             print("{},\t".format(loss))
             if i % 10 == 0:
                 writer.add_scalar(
                     "Every_10th_batch_loss", loss, epoch * len(dataloader_train) + i
                 )
 
+            # save as best model if loss is better than previous best
+            if loss < best_batch_loss:
+                best_batch_loss = loss
+                model_file = (
+                    model_path
+                    + f"handwriting_{('un' if args.uncond else '')}cond_best.pt"
+                )
+                torch.save(model.state_dict(), model_file)
+                optim_file = model_file.split(".pt")[0] + "_optim.pt"
+                torch.save(optimizer, optim_file)
+
+        # do the per-epoch logging
         epoch_avg_loss = np.array(train_losses).mean()
         writer.add_scalar("Avg_loss_for_epoch", epoch_avg_loss, epoch)
-        print("Average training-loss for epoch {} is: {}".format(epoch, epoch_avg_loss))
+        print(f"Average training-loss for epoch {epoch} is: {epoch_avg_loss}")
 
-        # save model if loss is better than previous best
-        if epoch_avg_loss < best_epoch_avg_loss:
-            best_epoch_avg_loss = epoch_avg_loss
-            model_file = model_path + "handwriting_{}cond_ep{}.pt".format(
-                ("un" if args.uncond else ""), epoch
-            )
-            torch.save(model.state_dict(), model_file)
-            optim_file = model_file.split(".pt")[0] + "_optim.pt"
-            torch.save(optimizer, optim_file)
+        model_file = (
+            model_path + f"handwriting_{('un' if args.uncond else '')}cond_ep{epoch}.pt"
+        )
+        torch.save(model.state_dict(), model_file)
+        optim_file = model_file.split(".pt")[0] + "_optim.pt"
+        torch.save(optimizer, optim_file)
 
         # generate samples from model
         sample_count = 3
