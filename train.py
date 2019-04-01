@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, SubsetRandomSampler
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tensorboardX import SummaryWriter
 
 from utils import plot_stroke, normalize_data, filter_long_strokes, OneHotEncoder
@@ -228,17 +229,22 @@ def train(device, args, data_path="data/"):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=0)
     # optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-2,
     #                                   weight_decay=0, momentum=0)
+
     if args.resume is None:
         model.init_params()
     else:
         model.load_state_dict(torch.load(args.resume, map_location=device))
         print("Resuming trainig on {}".format(args.resume))
-        resume_optim_file = args.resume.split(".pt")[0] + "_optim.pt"
-        if os.path.exists(resume_optim_file):
-            optimizer = torch.load(resume_optim_file, map_location=device)
+        # resume_optim_file = args.resume.split(".pt")[0] + "_optim.pt"
+        # if os.path.exists(resume_optim_file):
+        #     optimizer = torch.load(resume_optim_file, map_location=device)
+
+    scheduler = ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.1, patience=10, verbose=True
+    )
 
     best_batch_loss = 1e7
-    for epoch in range(100):
+    for epoch in range(200):
 
         train_losses = []
         validation_iters = []
@@ -326,6 +332,8 @@ def train(device, args, data_path="data/"):
 
         for i, f in enumerate(figs):
             writer.add_figure(f"samples/image_{i}", f, epoch)
+
+        scheduler.step(epoch_avg_loss)
 
 
 def main():
