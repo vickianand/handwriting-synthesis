@@ -72,8 +72,9 @@ def main():
     )
     parser.add_argument("-sl", "--sample_length", dest="sl", default=600, type=int)
     parser.add_argument("-ns", "--num_sample", dest="ns", default=2, type=int)
+    parser.add_argument("--seed", default=42, type=int)
 
-    args = vars(parser.parse_args())
+    args = parser.parse_args()
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
@@ -81,22 +82,23 @@ def main():
     if use_cuda:
         torch.cuda.empty_cache()
 
-    np.random.seed(101)
-    torch.random.manual_seed(101)
+    print(f"using seed = {args.seed}")
+    np.random.seed(args.seed)
+    torch.random.manual_seed(args.seed)
 
     # generate samples from some available trained models
-    epoch_list = args["epoch_list"]
+    epoch_list = args.epoch_list
     for epoch in epoch_list:
         print("Sampling from epoch {} model.".format(epoch))
         generate_from_model(
-            model_name="handwriting_uncond_ep{}.pt".format(epoch),
+            model_name="handwriting_uncond_{}.pt".format(epoch),
             device=device,
-            sample_length=args["sl"],
-            num_sample=args["ns"],
+            sample_length=args.sl,
+            num_sample=args.ns,
         )
 
 
 if __name__ == "__main__":
-    # main()
+    main()
     # generate_from_synth_model(model_name="handwriting_cond_ep1.pt")
-    generate_from_synth_model(model_name="none")
+    # generate_from_synth_model(model_name="none")
