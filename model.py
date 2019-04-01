@@ -48,21 +48,21 @@ class HandWritingRNN(torch.nn.Module):
                 else rnn(rnn_inp)
             )
 
-        # clip LSTM derivatives to (-10, 10) ::: may not be necessary
-        if rnn_out[0][0].requires_grad:
-            for o in rnn_out:
-                o[0].register_hook(lambda x: x.clamp(-10, 10))  # h_1 to h_n
-                # o[1][1].register_hook(lambda x: x.clamp(-10, 10))  # c_n
-                # the above clamp works on CPU but not on GPU (need to debug)
+        # # clip LSTM derivatives to (-10, 10) ::: may not be necessary
+        # if rnn_out[0][0].requires_grad:
+        #     for o in rnn_out:
+        #         o[0].register_hook(lambda x: x.clamp(-10, 10))  # h_1 to h_n
+        #         # o[1][1].register_hook(lambda x: x.clamp(-10, 10))  # c_n
+        #         # the above clamp works on CPU but not on GPU (need to debug)
 
         # rnn_out is a list of tuples (out, (h, c))
         lstm_out_states = [o[1] for o in rnn_out]
         rnn_out = torch.cat([o[0] for o in rnn_out], dim=2)
 
         y = self.last_layer(rnn_out)
-        # clamp gradienet ::: may not be necessary
-        if y.requires_grad:
-            y.register_hook(lambda x: x.clamp(min=-100, max=100))
+        # # clamp gradienet ::: may not be necessary
+        # if y.requires_grad:
+        #     y.register_hook(lambda x: x.clamp(min=-100, max=100))
 
         log_pi = torch.log_softmax(y[:, :, : self.n_gaussians], dim=-1)
         mu = y[:, :, self.n_gaussians : 3 * self.n_gaussians]
@@ -250,7 +250,7 @@ class HandWritingSynthRNN(torch.nn.Module):
                 else rnn(rnn_inp)
             )
 
-        # clip LSTM derivatives to (-10, 10)
+        # clip LSTM derivatives to (-10, 10) ::: may not be necessary
         if rnn_out[0][0].requires_grad:
             for o in rnn_out:
                 o[0].register_hook(lambda x: x.clamp(-10, 10))  # h_1 to h_n
@@ -261,7 +261,7 @@ class HandWritingSynthRNN(torch.nn.Module):
         lstm_out_states = [o[1] for o in rnn_out]
         rnn_out = torch.cat([o[0] for o in rnn_out], dim=2)
         y = self.last_layer(rnn_out)
-
+        # clamp gradienet ::: may not be necessary
         if y.requires_grad:
             y.register_hook(lambda x: x.clamp(min=-100, max=100))
 
@@ -283,6 +283,18 @@ class HandWritingSynthRNN(torch.nn.Module):
             prev_kappa,
             phi_list,
         )
+
+    def init_params(self):
+        for param in chain(self.first_rnn.parameters(), self.rnns.parameters()):
+            if param.dim() == 1:
+                torch.nn.init.uniform_(param, -1e-2, 1e-2)
+            else:
+                torch.nn.init.orthogonal_(param)
+        for param in chain(self.last_layer.parameters(), self.h_to_w.parameters()):
+            if param.dim() == 1:
+                torch.nn.init.uniform_(param, -1e-2, 1e-2)
+            else:
+                torch.nn.init.xavier_uniform_(param)
 
     def generate(self, sentences, bias=0.25, device=torch.device("cpu")):
         """
@@ -355,15 +367,3 @@ class HandWritingSynthRNN(torch.nn.Module):
             samples[i, :, 1:] = distribn.sample()
 
         return samples[1:, :, :]  # remove dummy first zeros
-
-    def init_params(self):
-        for param in chain(self.first_rnn.parameters(), self.rnns.parameters()):
-            if param.dim() == 1:
-                torch.nn.init.uniform_(param, -1e-2, 1e-2)
-            else:
-                torch.nn.init.orthogonal_(param)
-        for param in chain(self.last_layer.parameters(), self.h_to_w.parameters()):
-            if param.dim() == 1:
-                torch.nn.init.uniform_(param, -1e-2, 1e-2)
-            else:
-                torch.nn.init.xavier_uniform_(param)
