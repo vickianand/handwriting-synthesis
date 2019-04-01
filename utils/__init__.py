@@ -140,3 +140,43 @@ class OneHotEncoder:
             for idx_tnsr in sentences_idx
         ]
         return one_hot_
+
+
+def plot_phi(phi_list):
+    """
+    phi_list: list of (len_seq number of) phi each of shape (B, n_char)
+    """
+    # print(f"len(phi_list): {len(phi_list)}, shape_item: {phi_list[0].shape}")
+    fig_list = []
+    for i in range(phi_list[0].shape[0]):
+        single_list = [phi[i] for phi in phi_list]  # select phi one sequence from batch
+        arr = torch.stack(single_list, dim=1).cpu().numpy()
+
+        fig = pyplot.Figure()
+        ax = fig.add_subplot(111)
+        im = ax.imshow(arr, origin="lower", aspect="auto", interpolation="nearest")
+        fig.colorbar(im)
+
+        fig_list.append(fig)
+
+    return fig_list
+
+
+def plot_attn_scalar(sclr_list):
+    """
+    sclr_list: list of (len_seq number of) phi each of shape (B, K)
+    """
+    # print(f"len(sclr_list): {len(sclr_list)}, shape_item: {sclr_list[0].shape}")
+    fig_list = []
+    for i in range(sclr_list[0].shape[0]):
+        single_list = [sclr[i] for sclr in sclr_list]
+        arr = torch.stack(single_list, dim=1).cpu().numpy()
+
+        fig = pyplot.Figure()
+        ax = fig.add_subplot(111)
+        for i in range(arr.shape[0]):
+            ax.plot(arr[i], label="%d" % i)
+        ax.legend()
+        fig_list.append(fig)
+
+    return fig_list

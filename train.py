@@ -10,6 +10,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tensorboardX import SummaryWriter
 
 from utils import plot_stroke, normalize_data, filter_long_strokes, OneHotEncoder
+from utils import plot_phi, plot_attn_scalar
 from model import HandWritingRNN, HandWritingSynthRNN
 
 # ------------------------------------------------------------------------------
@@ -296,8 +297,10 @@ def train(device, args, data_path="data/"):
                 optim_file = model_file.split(".pt")[0] + "_optim.pt"
                 torch.save(optimizer, optim_file)
 
-        # do the per-epoch logging
         epoch_avg_loss = np.array(train_losses).mean()
+        scheduler.step(epoch_avg_loss)
+
+        # ======================== do the per-epoch logging ========================
         writer.add_scalar("Avg_loss_for_epoch", epoch_avg_loss, epoch)
         print(f"Average training-loss for epoch {epoch} is: {epoch_avg_loss}")
 
@@ -312,11 +315,11 @@ def train(device, args, data_path="data/"):
         sample_count = 3
         sentences = ["Welcome to lyrebird"] + ["hello world"] * (sample_count - 1)
         sentences = [s.to(device) for s in oh_encoder.one_hot(sentences)]
-        generated_samples = (
-            model.generate(length=600, batch=sample_count, device=device)
-            if args.uncond
-            else model.generate(sentences=sentences, device=device)
-        )
+
+        if args.uncond:
+            generated_samples = model.generate(600, batch=sample_count, device=device)
+        else:
+            generated_samples, attn_vars = model.generate(sentences, device=device)
 
         figs = []
         # save png files of the generated models
@@ -333,7 +336,12 @@ def train(device, args, data_path="data/"):
         for i, f in enumerate(figs):
             writer.add_figure(f"samples/image_{i}", f, epoch)
 
-        scheduler.step(epoch_avg_loss)
+        if not args.uncond:
+            figs_phi = plot_phi(attn_vars["phi_list"])
+            figs_kappa = plot_attn_scalar(attn_vars["kappa_list"])
+            for i, (f_phi, f_kappa) in enumerate(zip(figs_phi, figs_kappa)):
+                writer.add_figure(f"attention/phi_{i}", f_phi, epoch)
+                writer.add_figure(f"attention/kappa_{i}", f_kappa, epoch)
 
 
 def main():

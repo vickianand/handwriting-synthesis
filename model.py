@@ -206,8 +206,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             if lstm_in_states is None
             else lstm_in_states[0]
         )
-        phi_list = []
-        kappa_list = []
+        attn_vars = {"phi_list": [], "kappa_list": []}
         for x in inp:
             rnn_inp = torch.cat((x, prev_window), dim=1)  # (B, 3+n_char)
             h, c = self.first_rnn(rnn_inp, (h, c))
@@ -225,8 +224,8 @@ class HandWritingSynthRNN(torch.nn.Module):
             phi = ((beta * (kappa - u_seq) ** 2).exp() * alpha).sum(dim=1)  # (B, U)
             phi = phi * c_masks  # Both of shape (B, U)
 
-            kappa_list.append(kappa)
-            phi_list.append(phi)
+            attn_vars["kappa_list"].append(kappa.squeeze())  # (B, K)
+            attn_vars["phi_list"].append(phi)  # (B, U)
 
             # shape: (B, n_char)
             prev_window = (phi.unsqueeze(2) * c_seq).sum(dim=1)
@@ -281,7 +280,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             lstm_out_states,
             prev_window,
             prev_kappa,
-            phi_list,
+            attn_vars,
         )
 
     def init_params(self):
@@ -321,14 +320,18 @@ class HandWritingSynthRNN(torch.nn.Module):
         window = torch.zeros(batch, n_char, device=device)
         kappa = torch.zeros(batch, self.n_gaussians_window, 1, device=device)
 
-        phi_list = []
+        attn_vars = {"phi_list": [], "kappa_list": []}
+
         for i in range(1, length + 1):
             # get distribution parameters
             with torch.no_grad():
-                e, log_pi, mu, sigma, rho, lstm_states, window, kappa, phi_list_i = self.forward(
+                e, log_pi, mu, sigma, rho, lstm_states, window, kappa, attn_vars_i = self.forward(
                     samples[i - 1 : i], c_seq, c_masks, lstm_states, window, kappa
                 )
-            phi_list += phi_list_i
+
+            attn_vars["phi_list"] += attn_vars_i["phi_list"]
+            attn_vars["kappa_list"] += attn_vars_i["kappa_list"]
+
             # sample from the distribution (returned parameters)
             # samples[i, :, 0] = e[-1, :] > 0.5
             distrbn1 = Bernoulli(e[-1, :])
@@ -366,4 +369,4 @@ class HandWritingSynthRNN(torch.nn.Module):
 
             samples[i, :, 1:] = distribn.sample()
 
-        return samples[1:, :, :]  # remove dummy first zeros
+        return samples[1:, :, :], attn_vars  # remove dummy first zeros
