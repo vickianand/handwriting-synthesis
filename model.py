@@ -48,21 +48,11 @@ class HandWritingRNN(torch.nn.Module):
                 else rnn(rnn_inp)
             )
 
-        # # clip LSTM derivatives to (-10, 10) ::: may not be necessary
-        # if rnn_out[0][0].requires_grad:
-        #     for o in rnn_out:
-        #         o[0].register_hook(lambda x: x.clamp(-10, 10))  # h_1 to h_n
-        #         # o[1][1].register_hook(lambda x: x.clamp(-10, 10))  # c_n
-        #         # the above clamp works on CPU but not on GPU (need to debug)
-
         # rnn_out is a list of tuples (out, (h, c))
         lstm_out_states = [o[1] for o in rnn_out]
         rnn_out = torch.cat([o[0] for o in rnn_out], dim=2)
 
         y = self.last_layer(rnn_out)
-        # # clamp gradienet ::: may not be necessary
-        # if y.requires_grad:
-        #     y.register_hook(lambda x: x.clamp(min=-100, max=100))
 
         log_pi = torch.log_softmax(y[:, :, : self.n_gaussians], dim=-1)
         mu = y[:, :, self.n_gaussians : 3 * self.n_gaussians]
@@ -229,8 +219,6 @@ class HandWritingSynthRNN(torch.nn.Module):
 
             # shape: (B, n_char)
             prev_window = (phi.unsqueeze(2) * c_seq).sum(dim=1)
-            if prev_window.requires_grad:
-                prev_window.register_hook(lambda x: x.clamp(-100, 100))
             window_list.append(prev_window)
             prev_kappa = kappa
 
@@ -249,20 +237,10 @@ class HandWritingSynthRNN(torch.nn.Module):
                 else rnn(rnn_inp)
             )
 
-        # clip LSTM derivatives to (-10, 10) ::: may not be necessary
-        if rnn_out[0][0].requires_grad:
-            for o in rnn_out:
-                o[0].register_hook(lambda x: x.clamp(-10, 10))  # h_1 to h_n
-                # o[1][1].register_hook(lambda x: x.clamp(-10, 10))  # c_n
-                # the above clamp works on CPU but not on GPU (need to debug)
-
         # rnn_out is a list of tuples (out, (h, c))
         lstm_out_states = [o[1] for o in rnn_out]
         rnn_out = torch.cat([o[0] for o in rnn_out], dim=2)
         y = self.last_layer(rnn_out)
-        # clamp gradienet ::: may not be necessary
-        if y.requires_grad:
-            y.register_hook(lambda x: x.clamp(min=-100, max=100))
 
         log_pi = torch.log_softmax(y[:, :, : self.n_gaussians], dim=-1)
         mu = y[:, :, self.n_gaussians : 3 * self.n_gaussians]
