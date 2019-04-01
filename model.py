@@ -138,8 +138,7 @@ class HandWritingSynthRNN(torch.nn.Module):
         num_layers=3,
         n_gaussians_window=10,
         n_char=57,
-        max_stroke_len=1000,
-        max_sentence_len=59,
+        kappa_factor=0.05,
     ):
         """
         input_size is fixed to 3.
@@ -151,7 +150,7 @@ class HandWritingSynthRNN(torch.nn.Module):
         self.n_gaussians_window = n_gaussians_window
         self.memory_cells = memory_cells
         self.n_char = n_char
-
+        self.kappa_factor = kappa_factor
         self.first_rnn = torch.nn.LSTMCell(3 + n_char, memory_cells)
         self.rnns = torch.nn.ModuleList()
         input_size = 3 + memory_cells + n_char
@@ -206,7 +205,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             window_params = self.h_to_w(h).exp()  # (B, 3*K)
             alpha, beta, kappa = window_params.unsqueeze(-1).chunk(chunks=3, dim=1)
             # shape : (B, K=10, 1); unsqueeze() for broadcasting into (B, K, U)
-            kappa += prev_kappa
+            kappa = prev_kappa + kappa * self.kappa_factor
             beta = -beta
             # Weights for soft-window calculation
             U = c_seq.shape[1]

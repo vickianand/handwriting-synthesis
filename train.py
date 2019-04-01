@@ -220,9 +220,8 @@ def train(device, args, data_path="data/"):
         if args.uncond
         else HandWritingSynthRNN(
             n_char=N_CHAR,
-            max_stroke_len=MAX_STROKE_LEN,
-            max_sentence_len=MAX_SENTENCE_LEN,
             n_gaussians_window=10,
+            kappa_factor=0.05,
             **common_model_structure,
         ).to(device)
     )
@@ -241,7 +240,7 @@ def train(device, args, data_path="data/"):
         #     optimizer = torch.load(resume_optim_file, map_location=device)
 
     scheduler = ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.1, patience=10, verbose=True
+        optimizer, mode="min", factor=0.3, patience=3, verbose=True
     )
 
     best_batch_loss = 1e7
