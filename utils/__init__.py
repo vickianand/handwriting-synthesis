@@ -25,8 +25,8 @@ def plot_stroke(stroke, save_name=None):
         ax.plot(x[start:cut_value], y[start:cut_value], "k-", linewidth=3)
         start = cut_value + 1
     ax.axis("equal")
-    # ax.axes.get_xaxis().set_visible(False)
-    # ax.axes.get_yaxis().set_visible(False)
+    ax.axes.get_xaxis().set_visible(False)
+    ax.axes.get_yaxis().set_visible(False)
 
     if save_name is None:
         pyplot.show()
@@ -154,7 +154,9 @@ def plot_phi(phi_list):
 
         fig = pyplot.Figure()
         ax = fig.add_subplot(111)
-        im = ax.imshow(arr, origin="lower", aspect="auto", interpolation="nearest")
+        im = ax.imshow(
+            arr, origin="lower", aspect="auto", interpolation="nearest", cmap="hot"
+        )
         fig.colorbar(im)
 
         fig_list.append(fig)
@@ -175,7 +177,7 @@ def plot_attn_scalar(sclr_list):
         fig = pyplot.Figure()
         ax = fig.add_subplot(111)
         for i in range(arr.shape[0]):
-            ax.plot(arr[i], label="%d" % i)
+            ax.plot(arr[i], label="%d" % (i + 1))
         ax.legend()
         fig_list.append(fig)
 

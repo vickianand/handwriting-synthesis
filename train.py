@@ -149,7 +149,8 @@ def criterion(x, e, log_pi, mu, sigma, rho, masks):
     log_density = mog_density_2d(x, log_pi, mu, sigma, rho)
 
     masks = masks.contiguous().view(n * b)
-    ll = ((log_density + e.log()) * masks).sum() / masks.sum()
+    # ll = ((log_density + e.log()) * masks).sum() / masks.sum()
+    ll = ((log_density + e.log()) * masks).sum()
     return -ll
 
 
@@ -240,7 +241,7 @@ def train(device, args, data_path="data/"):
         #     optimizer = torch.load(resume_optim_file, map_location=device)
 
     scheduler = ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.3, patience=3, verbose=True
+        optimizer, mode="min", factor=0.1 ** 0.5, patience=10, verbose=True
     )
 
     best_batch_loss = 1e7
@@ -312,7 +313,7 @@ def train(device, args, data_path="data/"):
 
         # generate samples from model
         sample_count = 3
-        sentences = ["Welcome to lyrebird"] + ["hello world"] * (sample_count - 1)
+        sentences = ["welcome to lyrebird"] + ["abcd efgh vicki"] * (sample_count - 1)
         sentences = [s.to(device) for s in oh_encoder.one_hot(sentences)]
 
         if args.uncond:
