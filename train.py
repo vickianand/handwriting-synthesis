@@ -120,7 +120,7 @@ def criterion(x, e, log_pi, mu, sigma, rho, masks):
     Calculates the sequence loss as given in Eq. 26 of the paper
     Expected dimensions of input:
         x: (n, b, 3)
-        e: (n, b, 1)
+        e: (n, b)
         log_pi: (n, b, m)
         mu: (n, b, 2*m)
         sigma: (n, b, 2*m)
@@ -148,7 +148,7 @@ def criterion(x, e, log_pi, mu, sigma, rho, masks):
     # add small constant for numerical stability
     log_density = mog_density_2d(x, log_pi, mu, sigma, rho)
 
-    masks = masks.view(n * b)
+    masks = masks.contiguous().view(n * b)
     ll = ((log_density + e.log()) * masks).sum() / masks.sum()
     return -ll
 
@@ -175,7 +175,7 @@ def train(device, args, data_path="data/"):
     sentences = [snt.replace("\n", "") for snt in sentences]
     # Instead of removing the newline symbols, should it be used instead?
 
-    MAX_STROKE_LEN = 1000
+    MAX_STROKE_LEN = 800
     strokes, sentences, MAX_SENTENCE_LEN = filter_long_strokes(
         strokes, sentences, MAX_STROKE_LEN, max_index=args.n_data
     )
@@ -253,20 +253,20 @@ def train(device, args, data_path="data/"):
 
             # make batch_first = false
             x = x.permute(1, 0, 2)
-            # masks = masks.permute(1, 0, 2)
+            masks = masks.permute(1, 0)
 
-            # prepend a dummy point (zeros) and remove last point
-            inp_x = torch.cat(
-                [x.new_zeros(1, x.shape[1], x.shape[2]), x[:-1, :, :]], dim=0
-            )
-
+            # remove last point (prepending a dummy point (zeros) already done in data)
+            inp_x = x[:-1]  # shape : (T, B, 3)
+            masks = masks[:-1]  # shape: (B, T)
+            # c_seq.shape: (B, MAX_SENTENCE_LEN, n_char), c_masks.shape: (B, MAX_SENTENCE_LEN)
             inputs = (inp_x, c_seq, c_masks)
             if args.uncond:
                 inputs = (inp_x,)
 
             e, log_pi, mu, sigma, rho, *_ = model(*inputs)
 
-            loss = criterion(x, e, log_pi, mu, sigma, rho, masks)
+            # remove first point from x to make it y
+            loss = criterion(x[1:], e, log_pi, mu, sigma, rho, masks)
             train_losses.append(loss.detach().cpu().numpy())
 
             optimizer.zero_grad()

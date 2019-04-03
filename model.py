@@ -180,7 +180,8 @@ class HandWritingSynthRNN(torch.nn.Module):
             c_masks: 0 padded mask for c_seq with shape (B, U)
             lstm_in_states: input states for num_layers number of lstm 
                 layers; it is a list of num_layers tupels (h_i, c_i), with
-                both h_i and c_i tensor of dimensions (memory_cells,)
+                both h_0 and c_0 tensor of dimensions (B, memory_cells)
+                both h_i and c_i tensor of dimensions (T, B, memory_cells) for u > 0
             prev_window: (B, n_char)
             prev_kappa: (B, K=10, 1)
         """
