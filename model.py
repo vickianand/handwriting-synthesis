@@ -212,13 +212,13 @@ class HandWritingSynthRNN(torch.nn.Module):
             U = c_seq.shape[1]
             u_seq = torch.arange(1, U + 1).float().to(x.device)  # shape : (U)
             phi = ((beta * (kappa - u_seq) ** 2).exp() * alpha).sum(dim=1)  # (B, U)
-            phi = phi * c_masks  # Both of shape (B, U)
+            masked_phi = phi * c_masks  # Both of shape (B, U)
 
             attn_vars["kappa_list"].append(kappa.squeeze(dim=-1))  # (B, K)
             attn_vars["phi_list"].append(phi)  # (B, U)
 
             # shape: (B, n_char)
-            prev_window = (phi.unsqueeze(2) * c_seq).sum(dim=1)
+            prev_window = (masked_phi.unsqueeze(2) * c_seq).sum(dim=1)
             window_list.append(prev_window)
             prev_kappa = kappa
 
@@ -273,7 +273,9 @@ class HandWritingSynthRNN(torch.nn.Module):
             else:
                 torch.nn.init.xavier_uniform_(param)
 
-    def generate(self, sentences, bias=0.25, device=torch.device("cpu")):
+    def generate(
+        self, sentences, bias=0.25, device=torch.device("cpu"), use_stopping=False
+    ):
         """
         Get handwritten form for given sentences
         arguments:
@@ -281,31 +283,56 @@ class HandWritingSynthRNN(torch.nn.Module):
         return:
             samples: tensor of handwritten form for the sentences
         """
+        sentence_lens = [s.shape[0] for s in sentences]
+        # print(sentence_lens)
 
-        # pad sentences and create generate c_masks
+        # pad sentences (B, U, n_char) and create generate c_masks
         c_seq = torch.nn.utils.rnn.pad_sequence(
             sentences, batch_first=True, padding_value=0.0
         )
         batch, U, n_char = c_seq.shape
+
+        if use_stopping:
+            # add couple of dummy 0s at end sentences (U = U + 2; will help for termication condition)
+            c_seq = torch.cat((c_seq, c_seq.new_zeros(batch, 2, n_char)), dim=1)
+            U = U + 2
+
         c_masks = torch.zeros(batch, U, device=device)
         for i, s in enumerate(sentences):
             c_masks[i][: s.shape[0]] = 1
 
-        length = 600  # this needs to change (length should not be hard-coded)
+        max_length = 600
+        if use_stopping:
+            max_length = 1000
         # empty matrix of required shape with batch_first = False
-        samples = torch.empty(length + 1, batch, 3, device=device)
+        samples = torch.empty(max_length + 1, batch, 3, device=device)
         lstm_states = None
         window = torch.zeros(batch, n_char, device=device)
         kappa = torch.zeros(batch, self.n_gaussians_window, 1, device=device)
 
         attn_vars = {"phi_list": [], "kappa_list": []}
 
-        for i in range(1, length + 1):
+        for i in range(1, max_length + 1):
             # get distribution parameters
             with torch.no_grad():
                 e, log_pi, mu, sigma, rho, lstm_states, window, kappa, attn_vars_i = self.forward(
                     samples[i - 1 : i], c_seq, c_masks, lstm_states, window, kappa
                 )
+
+            # implement stopping criteria
+            if use_stopping:
+                end_loop = True
+                strokes_mask = samples.new_zeros(batch)
+                phi = attn_vars_i["phi_list"][-1]
+                for j, l in enumerate(sentence_lens):
+                    max_phi_idx = phi[j].argmax()
+                    if max_phi_idx <= l:
+                        end_loop = False
+                        strokes_mask[j] = 1.0
+                # keeping at lower limit of stroke sequence to 20
+                if i > 20 and end_loop:
+                    print(f"breaking stroke generation at {i} sequence length")
+                    break
 
             attn_vars["phi_list"] += attn_vars_i["phi_list"]
             attn_vars["kappa_list"] += attn_vars_i["kappa_list"]
@@ -346,5 +373,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             distribn = MultivariateNormal(loc=mu, covariance_matrix=sigma2d)
 
             samples[i, :, 1:] = distribn.sample()
+            if use_stopping:
+                samples[i, :, :] *= strokes_mask.unsqueeze(-1)
 
         return samples[1:, :, :], attn_vars  # remove dummy first zeros

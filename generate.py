@@ -42,7 +42,7 @@ def generate_from_synth_model(
         "this text is generated using an RNN model",
         "Welcome to Lyrebird!",
     ],
-    bias=0.25,
+    bias=3.0,
     device=torch.device("cpu"),
 ):
     model = HandWritingSynthRNN()
@@ -51,7 +51,7 @@ def generate_from_synth_model(
     oh_encoder = pickle.load(open("data/one_hot_encoder.pkl", "rb"))
     sentences = [s.to(device) for s in oh_encoder.one_hot(sentence_list)]
     generated_samples, attn_vars = model.generate(
-        sentences=sentences, bias=bias, device=device
+        sentences=sentences, bias=bias, device=device, use_stopping=True
     )
 
     model_name = model_path.split("/")[-1].replace(".pt", "")
