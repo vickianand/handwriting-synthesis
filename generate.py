@@ -14,7 +14,7 @@ def generate_from_model(
     model_path="data/model_files/handwriting_uncond_best.pt",
     sample_length=600,
     num_sample=2,
-    bias=0.25,
+    bias=0.5,
     device=torch.device("cpu"),
 ):
     """

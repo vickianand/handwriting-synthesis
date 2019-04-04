@@ -62,6 +62,37 @@ Example command for generating from the saved best unconditional model:
 ```bash
 python generate.py --uncond --model_path data/model_files/handwriting_uncond_best.pt --sample_length 600 --num_sample 4
 ```
+## Samples
+
+### Smaples from conditional model
+
+"Hello World"
+![Hello World](samples/handwriting_cond_best_0.png)
+<br>
+
+"Welcome to Lyrebird"
+![Welcome to Lyrebird](samples/handwriting_cond_best_1.png)
+<br>
+
+"Welcome to Lyrebird"
+![Welcome to Lyrebird](samples/handwriting_cond_best_2.png)
+
+### Smaples from conditional model
+
+Random sample 1
+![Random sample 1](samples/handwriting_uncond_best_0.png)
+<br>
+
+Random sample 2
+![Random sample 2](samples/handwriting_uncond_best_1.png)
+<br>
+
+Random sample 3
+![Random sample 3](samples/handwriting_uncond_best_2.png)
+<br>
+
+Random sample 4
+![Random sample 4](samples/handwriting_uncond_best_3.png)
 
 ### Known issues
 
