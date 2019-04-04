@@ -1,5 +1,4 @@
 # Specific to this project
-data/
 runs/
 temp.py
 .vscode/

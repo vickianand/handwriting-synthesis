@@ -149,8 +149,8 @@ def criterion(x, e, log_pi, mu, sigma, rho, masks):
     log_density = mog_density_2d(x, log_pi, mu, sigma, rho)
 
     masks = masks.contiguous().view(n * b)
-    # ll = ((log_density + e.log()) * masks).sum() / masks.sum()
-    ll = ((log_density + e.log()) * masks).sum()
+    ll = ((log_density + e.log()) * masks).sum() / masks.sum()
+    # ll = ((log_density + e.log()) * masks).sum()
     return -ll
 
 
@@ -215,7 +215,7 @@ def train(device, args, data_path="data/"):
         dataset_validn, batch_size=args.batch_size, shuffle=True, drop_last=False
     )
 
-    common_model_structure = {"memory_cells": 400, "n_gaussians": 20, "num_layers": 3}
+    common_model_structure = {"memory_cells": 400, "n_gaussians": 20, "num_layers": 2}
     model = (
         HandWritingRNN(**common_model_structure).to(device)
         if args.uncond

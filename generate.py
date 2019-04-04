@@ -11,53 +11,56 @@ from model import HandWritingRNN, HandWritingSynthRNN
 
 
 def generate_from_model(
-    model_name,
-    model_path="data/unconditional_models/",
+    model_path="data/model_files/handwriting_uncond_best.pt",
     sample_length=600,
     num_sample=2,
+    bias=0.25,
     device=torch.device("cpu"),
 ):
     """
-    Generate num_sample (default 2) number of samples each of length 
-    sample_length (default 300) using a pretrained model
+    Generate num_sample number of samples each of length sample_length using a 
+    pretrained model
     """
-    model_file = model_path + model_name
     handWritingRNN = HandWritingRNN()
-    handWritingRNN.load_state_dict(torch.load(model_file, map_location=device))
-    handWritingRNN.to(device)
+    handWritingRNN.load_state_dict(torch.load(model_path, map_location=device))
     generated_samples = handWritingRNN.generate(
-        device=device, length=sample_length, batch=num_sample
+        device=device, length=sample_length, batch=num_sample, bias=bias
     )
 
+    model_name = model_path.split("/")[-1].replace(".pt", "")
     for i in range(num_sample):
         plot_stroke(
             generated_samples[:, i, :].cpu().numpy(),
-            save_name="data/samples/{}_{}.png".format(model_name.replace(".pt", ""), i),
+            save_name="samples/{}_{}.png".format(model_name, i),
         )
 
 
 def generate_from_synth_model(
-    model_name="None",
-    model_path="data/conditional_models/",
-    sentence_list=["Welcome to Lyrebird", "Hello World"],
+    model_path="data/model_files/handwriting_cond_best.pt",
+    sentence_list=[
+        "hello world !!",
+        "this text is generated using an RNN model",
+        "Welcome to Lyrebird!",
+    ],
+    bias=0.25,
     device=torch.device("cpu"),
 ):
     model = HandWritingSynthRNN()
-    model_file = model_path + model_name
-    if os.path.exists(model_file):
-        model.load_state_dict(torch.load(model_file, map_location=device))
-        # handWritingRNN.to(device)
+    if os.path.exists(model_path):
+        model.load_state_dict(torch.load(model_path, map_location=device))
     oh_encoder = pickle.load(open("data/one_hot_encoder.pkl", "rb"))
-    sentences = oh_encoder.one_hot(sentence_list)
-    generated_samples = model.generate(sentences=sentences, device=device)
+    sentences = [s.to(device) for s in oh_encoder.one_hot(sentence_list)]
+    generated_samples, attn_vars = model.generate(
+        sentences=sentences, bias=bias, device=device
+    )
 
-    for i in range(len(sentences)):
+    model_name = model_path.split("/")[-1].replace(".pt", "")
+    for i in range(len(sentence_list)):
         plot_stroke(
             generated_samples[:, i, :].cpu().numpy(),
-            save_name="data/synth_samples/{}_{}.png".format(
-                model_name.replace(".pt", ""), i
-            ),
+            save_name="samples/{}_{}.png".format(model_name, i),
         )
+        print(f"generated strokes for: {sentence_list[i]}")
 
 
 def main():
@@ -65,40 +68,61 @@ def main():
     """
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
-        "--epoch_list",
-        help="epoch numbers whose models to be used for generating samples",
-        nargs="+",
-        default=[93],
+        "--uncond",
+        help="If want to generate using the unconditional model. Default is conditional",
+        action="store_const",
+        const=True,
+        default=False,
     )
-    parser.add_argument("-sl", "--sample_length", dest="sl", default=600, type=int)
-    parser.add_argument("-ns", "--num_sample", dest="ns", default=2, type=int)
+    parser.add_argument(
+        "--model_path",
+        required=True,
+        help="path to the saved sate_dict file to be used for generating samples",
+    )
+    parser.add_argument(
+        "--text",
+        help="text for which handwriting to be synthesized (for conditional model)",
+        nargs="+",
+        default=["Hello world!"],
+    )
+    parser.add_argument(
+        "--sample_length",
+        default=600,
+        type=int,
+        help="sample length for unconditional model",
+    )
+    parser.add_argument(
+        "--num_sample",
+        default=5,
+        type=int,
+        help="number of samples to generate from unconditional model",
+    )
     parser.add_argument("--seed", default=42, type=int)
 
     args = parser.parse_args()
 
-    use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda:0" if use_cuda else "cpu")
-
-    if use_cuda:
-        torch.cuda.empty_cache()
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     print(f"using seed = {args.seed}")
     np.random.seed(args.seed)
     torch.random.manual_seed(args.seed)
 
     # generate samples from some available trained models
-    epoch_list = args.epoch_list
-    for epoch in epoch_list:
-        print("Sampling from epoch {} model.".format(epoch))
+    print(f"Sampling from: {args.model_path}")
+    if args.uncond:
         generate_from_model(
-            model_name="handwriting_uncond_{}.pt".format(epoch),
+            model_path=args.model_path,
             device=device,
-            sample_length=args.sl,
-            num_sample=args.ns,
+            sample_length=args.sample_length,
+            num_sample=args.num_sample,
+        )
+    else:
+        generate_from_synth_model(
+            model_path=args.model_path, device=device, sentence_list=args.text
         )
 
 
 if __name__ == "__main__":
     main()
-    # generate_from_synth_model(model_name="handwriting_cond_ep1.pt")
-    # generate_from_synth_model(model_name="none")
+    # generate_from_model()
+    # generate_from_synth_model()

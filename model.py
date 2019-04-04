@@ -4,7 +4,7 @@ from torch.distributions import MultivariateNormal, Bernoulli, Categorical
 
 
 class HandWritingRNN(torch.nn.Module):
-    def __init__(self, memory_cells=400, n_gaussians=20, num_layers=3):
+    def __init__(self, memory_cells=400, n_gaussians=20, num_layers=2):
         """
         input_size is fixed to 3.
         hidden_size = memory_cells 
@@ -104,15 +104,15 @@ class HandWritingRNN(torch.nn.Module):
                 mu[-1]
                 .view(batch, self.n_gaussians, 2)
                 .gather(dim=1, index=index_2)
-                .squeeze()
+                .squeeze(dim=1)
             )
             sigma = (
                 (sigma[-1] / torch.exp(torch.tensor(1 + bias)))
                 .view(batch, self.n_gaussians, 2)
                 .gather(dim=1, index=index_2)
-                .squeeze()
+                .squeeze(dim=1)
             )
-            rho = rho[-1].gather(dim=1, index=index_1).squeeze()
+            rho = rho[-1].gather(dim=1, index=index_1).squeeze(dim=1)
 
             sigma2d = sigma.new_zeros(batch, 2, 2)
             sigma2d[:, 0, 0] = sigma[:, 0] ** 2
@@ -135,7 +135,7 @@ class HandWritingSynthRNN(torch.nn.Module):
         self,
         memory_cells=400,
         n_gaussians=20,
-        num_layers=3,
+        num_layers=2,
         n_gaussians_window=10,
         n_char=57,
         kappa_factor=0.05,
@@ -214,7 +214,7 @@ class HandWritingSynthRNN(torch.nn.Module):
             phi = ((beta * (kappa - u_seq) ** 2).exp() * alpha).sum(dim=1)  # (B, U)
             phi = phi * c_masks  # Both of shape (B, U)
 
-            attn_vars["kappa_list"].append(kappa.squeeze())  # (B, K)
+            attn_vars["kappa_list"].append(kappa.squeeze(dim=-1))  # (B, K)
             attn_vars["phi_list"].append(phi)  # (B, U)
 
             # shape: (B, n_char)
@@ -327,15 +327,15 @@ class HandWritingSynthRNN(torch.nn.Module):
                 mu[-1]
                 .view(batch, self.n_gaussians, 2)
                 .gather(dim=1, index=index_2)
-                .squeeze()
+                .squeeze(dim=1)
             )
             sigma = (
                 (sigma[-1] / torch.exp(torch.tensor(1 + bias)))
                 .view(batch, self.n_gaussians, 2)
                 .gather(dim=1, index=index_2)
-                .squeeze()
+                .squeeze(dim=1)
             )
-            rho = rho[-1].gather(dim=1, index=index_1).squeeze()
+            rho = rho[-1].gather(dim=1, index=index_1).squeeze(dim=1)
 
             sigma2d = sigma.new_zeros(batch, 2, 2)
             sigma2d[:, 0, 0] = sigma[:, 0] ** 2
